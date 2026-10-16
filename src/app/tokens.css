@@ -1,0 +1,74 @@
+/* 1handshake — generated from design/tokens.json by scripts/tokens-to-css.mjs. Do not edit by hand. */
+:root {
+  --paper: #F6F4EE;
+  --surface: #FFFFFF;
+  --surface-sunk: #ECE9E1;
+  --line: #E0DBD0;
+  --line-strong: #888174;
+  --ink: #1A1814;
+  --ink-muted: #665F55;
+  --fire: #FF5F1F;
+  --on-fire: #1A1814;
+  --fire-ink: #B23A07;
+  --fire-soft: #FFE9DD;
+  --node: #CFC8BA;
+  --success: #1E7A4C;
+  --danger: #B42318;
+  --focus: #1A1814;
+  --shadow-card: 0 1px 2px rgba(26,24,20,0.06), 0 10px 30px rgba(26,24,20,0.07);
+  --shadow-ai: 0 0 0 1px rgba(255,95,31,0.45), 0 0 28px rgba(255,95,31,0.28);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 28px;
+  --radius-pill: 999px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #141311;
+    --surface: #1E1C19;
+    --surface-sunk: #29261F;
+    --line: #36322B;
+    --line-strong: #7A7366;
+    --ink: #F2EEE6;
+    --ink-muted: #A9A296;
+    --fire: #FF6A2B;
+    --on-fire: #1A1814;
+    --fire-ink: #FF8B52;
+    --fire-soft: #3A1E10;
+    --node: #4D473E;
+    --success: #52C78E;
+    --danger: #FF8A80;
+    --focus: #F2EEE6;
+    --shadow-card: 0 1px 2px rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.35);
+    --shadow-ai: 0 0 0 1px rgba(255,106,43,0.55), 0 0 32px rgba(255,106,43,0.30);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #141311;
+  --surface: #1E1C19;
+  --surface-sunk: #29261F;
+  --line: #36322B;
+  --line-strong: #7A7366;
+  --ink: #F2EEE6;
+  --ink-muted: #A9A296;
+  --fire: #FF6A2B;
+  --on-fire: #1A1814;
+  --fire-ink: #FF8B52;
+  --fire-soft: #3A1E10;
+  --node: #4D473E;
+  --success: #52C78E;
+  --danger: #FF8A80;
+  --focus: #F2EEE6;
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.35);
+  --shadow-ai: 0 0 0 1px rgba(255,106,43,0.55), 0 0 32px rgba(255,106,43,0.30);
+  color-scheme: dark;
+}

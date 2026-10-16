@@ -1,0 +1,144 @@
+// Runs the SQL migration on an in-memory Postgres (PGlite) with a minimal Supabase auth stub,
+// then walks the core flows: invite → join, one-handshake-away, intro request with fires, wall RLS, ghost.
+// Usage: npm run test:db
+import { PGlite } from "@electric-sql/pglite";
+import { vector } from "@electric-sql/pglite-pgvector";
+import { readFileSync } from "node:fs";
+import assert from "node:assert/strict";
+
+const db = new PGlite({ extensions: { vector } });
+const sql = (q, p) => db.query(q, p);
+
+await db.exec(`
+  create role anon nologin; create role authenticated nologin;
+  create schema auth;
+  create table auth.users (id uuid primary key);
+  create function auth.uid() returns uuid language sql stable as
+    $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+  grant usage on schema public, auth to anon, authenticated;
+  grant execute on function auth.uid() to anon, authenticated;
+`);
+await db.exec(readFileSync("supabase/migrations/20261016000000_init.sql", "utf8"));
+await db.exec(readFileSync("supabase/seed.sql", "utf8"));
+await db.exec(`grant select, insert, update, delete on all tables in schema public to anon, authenticated;
+  grant usage on all sequences in schema public to authenticated;`);
+// Re-apply column-level restrictions after the broad grant above (Supabase grants table rights by default too).
+await db.exec(`revoke select, update on public.profiles from anon, authenticated;
+  grant select (id, handle, name, role, bio_md, avatar_path, city_id, open_to_hiring, open_to_network, invited_by, status, created_at) on public.profiles to anon, authenticated;
+  grant update (handle, name, role, bio_md, avatar_path, city_id, birth_date, open_to_hiring, open_to_network) on public.profiles to authenticated;`);
+
+const ids = {};
+for (const n of ["nik", "kate", "ivan", "anna", "david", "guest"]) ids[n] = crypto.randomUUID();
+const as = async (who, role = "authenticated") => {
+  await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${who ? ids[who] : ""}', false); set role ${role};`);
+};
+const asAdmin = () => db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false);`);
+
+// Founders seeded directly (the first member has no inviter).
+await asAdmin();
+const tb = (await sql(`select id from cities where name = 'tbilisi'`)).rows[0].id;
+for (const n of ["nik", "kate", "ivan", "anna", "david"]) {
+  await sql(`insert into profiles (id, handle, name, role, city_id, birth_date) values ($1, $2, $2, 'member', $3, '1990-01-01')`, [ids[n], n, tb]);
+}
+await sql(`select connect_pair($1,$2,'met',null,null)`, [ids.nik, ids.kate]);
+await sql(`select connect_pair($1,$2,'met',null,null)`, [ids.nik, ids.ivan]);
+await sql(`select connect_pair($1,$2,'met',null,null)`, [ids.kate, ids.anna]);
+await sql(`select connect_pair($1,$2,'met',null,null)`, [ids.ivan, ids.anna]);
+await sql(`select connect_pair($1,$2,'met',null,null)`, [ids.ivan, ids.david]);
+await sql(`select connect_pair($1,$2,'intro',null,null)`, [ids.kate, ids.nik]); // same pair, reversed
+assert.equal((await sql(`select count(*)::int c from connections`)).rows[0].c, 5, "a pair is stored once");
+console.log("✓ connections: one row per pair");
+
+// 1. One handshake away for nik: anna (via kate, ivan) and david (via ivan)
+await as("nik");
+let away = (await sql(`select person, mutuals from people_one_handshake_away() order by person`)).rows;
+const name = (id) => Object.keys(ids).find((k) => ids[k] === id);
+const awayNames = away.map((r) => name(r.person)).sort();
+assert.deepEqual(awayNames, ["anna", "david"]);
+assert.equal(away.find((r) => r.person === ids.anna).mutuals.length, 2);
+console.log("✓ one handshake away:", awayNames.join(", "), "· anna via", away.find((r) => r.person === ids.anna).mutuals.map(name).join(" + "));
+
+// open_to_network off on ivan hides david
+await as("ivan");
+await sql(`update profiles set open_to_network = false where id = auth.uid()`);
+await as("nik");
+away = (await sql(`select person, mutuals from people_one_handshake_away()`)).rows;
+assert.deepEqual(away.map((r) => name(r.person)), ["anna"]);
+assert.deepEqual(away[0].mutuals.map(name), ["kate"]);
+console.log("✓ open_to_network = false hides ivan's connections");
+await as("ivan");
+await sql(`update profiles set open_to_network = true where id = auth.uid()`);
+
+// birth date is not readable by others
+await as("kate");
+await assert.rejects(sql(`select birth_date from profiles where id = $1`, [ids.nik]), /permission denied/);
+console.log("✓ birth_date is private");
+// cannot promote yourself or change inviter
+await assert.rejects(sql(`update profiles set status = 'banned' where id = auth.uid()`), /permission denied/);
+console.log("✓ status is not user-editable");
+
+// 2. Invite flow
+await as("nik");
+const inv = (await sql(`select * from create_invite('nik/selfie.jpg')`)).rows[0];
+assert.equal(inv.status, "live");
+await as(null, "anon");
+const opened = (await sql(`select * from open_invite($1)`, [inv.code])).rows[0];
+assert.equal(opened.status, "scanned");
+assert.equal(opened.inviter_name, "nik");
+await sql(`select set_guest_step($1, 'about')`, [inv.code]);
+await asAdmin();
+await sql(`insert into auth.users (id) values ($1)`, [ids.guest]);
+await as("guest");
+const prof = (await sql(`select * from accept_invite($1, 'guest', 'guest one', 'designer', '# hi', $2, '1995-05-05')`, [inv.code, tb])).rows[0];
+assert.equal(prof.invited_by, ids.nik);
+await assert.rejects(sql(`select * from accept_invite($1, 'guest2', 'x', 'y', '', null, null)`, [inv.code]), /already a member|no longer valid/);
+await as("nik");
+const myInv = (await sql(`select status, guest_step from invites where id = $1`, [inv.id])).rows[0];
+assert.deepEqual(myInv, { status: "joined", guest_step: "done" });
+assert.equal((await sql(`select is_connected($1,$2) c`, [ids.nik, ids.guest])).rows[0].c, true);
+console.log("✓ invite: create → open (anon) → step → accept → 🤝 connected, code is single-use");
+
+// expired code
+await as("nik");
+const inv2 = (await sql(`select * from create_invite(null)`)).rows[0];
+await asAdmin();
+await sql(`update invites set expires_at = now() - interval '1 second' where id = $1`, [inv2.id]);
+await as(null, "anon");
+assert.equal((await sql(`select status from open_invite($1)`, [inv2.code])).rows[0].status, "expired");
+console.log("✓ invite expires after 5 minutes");
+
+// 3. Intro request with fires
+await as("nik");
+const req = (await sql(`select * from request_intro($1)`, [ids.anna])).rows[0];
+await assert.rejects(sql(`select * from request_intro($1)`, [ids.anna]), /one handshake away|duplicate/);
+await as("kate");
+await sql(`select back_request($1)`, [req.id]);
+await as("anna");
+let inc = (await sql(`select * from incoming_requests()`)).rows;
+assert.equal(inc.length, 1);
+assert.equal(Number(inc[0].fires), 1);
+assert.equal(inc[0].mutuals.length, 2);
+await as("david");
+await assert.rejects(sql(`select respond_request($1, true)`, [req.id]), /not your request/);
+await as("anna");
+await sql(`select respond_request($1, true)`, [req.id]);
+assert.equal((await sql(`select kind from connections where user_a = least($1::uuid,$2::uuid) and user_b = greatest($1::uuid,$2::uuid)`, [ids.nik, ids.anna])).rows[0].kind, "intro");
+console.log("✓ intro: request → 🔥 from kate → anna accepts → 🔗 connected");
+
+// 4. Wall
+await as("kate");
+await sql(`insert into wall_posts (wall_owner_id, author_id, body) values ($1, auth.uid(), 'great meetup!')`, [ids.nik]);
+await as("david");
+await assert.rejects(sql(`insert into wall_posts (wall_owner_id, author_id, body) values ($1, auth.uid(), 'hi')`, [ids.nik]), /row-level security/);
+console.log("✓ wall: connections can post, strangers cannot");
+
+// 5. Ghost
+await as("kate");
+await sql(`select become_ghost()`);
+await as("nik");
+const ghost = (await sql(`select name, status from profiles where id = $1`, [ids.kate])).rows[0];
+assert.deepEqual(ghost, { name: null, status: "ghost" });
+assert.equal((await sql(`select is_connected($1,$2) c`, [ids.nik, ids.kate])).rows[0].c, true);
+console.log("✓ ghost: personal data erased, the edge stays");
+
+console.log("\nall schema checks passed");
