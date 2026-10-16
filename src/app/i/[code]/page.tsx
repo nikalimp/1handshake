@@ -5,7 +5,7 @@ import { InviteProblem } from "@/components/invite-problem";
 import { Logo } from "@/components/logo";
 import { SignInButton } from "@/components/sign-in-button";
 import { getMe } from "@/lib/data";
-import { SITE_HOST } from "@/lib/env";
+import { APP_HOST } from "@/lib/env";
 import { inviteProblem, openInvite, selfieUrl } from "@/lib/invites";
 import { createClient } from "@/lib/supabase/server";
 
@@ -81,7 +81,7 @@ export default async function InviteLanding(props: PageProps<"/i/[code]">) {
         ) : (
           <SignInButton className="w-full" label="join with google" next={`/i/${code}/join`} />
         )}
-        <p className="meta mt-2.5 text-center">{SITE_HOST}/i/{code} · expires with {(inv.inviter_name ?? "their").split(" ")[0]}&apos;s code</p>
+        <p className="meta mt-2.5 text-center">{APP_HOST}/i/{code} · expires with {(inv.inviter_name ?? "their").split(" ")[0]}&apos;s code</p>
       </div>
     </main>
   );

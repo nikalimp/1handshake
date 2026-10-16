@@ -1,15 +1,14 @@
 "use client";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button, buttonClass } from "@/components/button";
 import { QrCode } from "@/components/qr-code";
-import { SITE_URL } from "@/lib/env";
+import { CARD_URL } from "@/lib/env";
 
 /** "share" → a sheet with the public card's QR, the link, copy and the phone's share menu. */
 export function ShareCard({ handle, name }: { handle: string; name: string }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const url = `${SITE_URL}/@${handle}`;
+  const url = `${CARD_URL}/@${handle}`;
 
   useEffect(() => {
     if (!open) return;
@@ -44,9 +43,9 @@ export function ShareCard({ handle, name }: { handle: string; name: string }) {
             <div className="rounded-[var(--radius-md)] bg-white p-2">
               <QrCode value={url} size={220} />
             </div>
-            <Link href={`/@${handle}`} className="meta break-all text-center underline-offset-2 hover:text-ink hover:underline">
+            <a href={url} target="_blank" rel="noopener" className="meta break-all text-center underline-offset-2 hover:text-ink hover:underline">
               {url.replace(/^https?:\/\//, "")} ↗
-            </Link>
+            </a>
             <div className="grid w-full grid-cols-2 gap-2">
               <Button variant="secondary" onClick={copy}>
                 {copied ? "copied ✓" : "copy link"}
@@ -54,9 +53,9 @@ export function ShareCard({ handle, name }: { handle: string; name: string }) {
               {typeof navigator !== "undefined" && "share" in navigator ? (
                 <Button onClick={() => navigator.share({ title: `${name} · 1handshake`, url }).catch(() => {})}>share…</Button>
               ) : (
-                <Link href={`/@${handle}`} className={buttonClass("primary")}>
+                <a href={url} target="_blank" rel="noopener" className={buttonClass("primary")}>
                   open card
-                </Link>
+                </a>
               )}
             </div>
             <button type="button" onClick={() => setOpen(false)} className="meta hover:text-ink">

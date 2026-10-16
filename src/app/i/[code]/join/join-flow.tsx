@@ -11,7 +11,7 @@ import { Progress } from "@/components/progress";
 import { ListField } from "@/components/list-field";
 import { MarkdownField } from "@/components/markdown-field";
 import { type Sphere, SpherePicker } from "@/components/sphere-picker";
-import { SITE_HOST } from "@/lib/env";
+import { CARD_HOST } from "@/lib/env";
 import { fileToSquareJpeg } from "@/lib/image";
 import { MAX_NEEDS } from "@/lib/needs";
 import { useRecorder } from "@/lib/use-recorder";
@@ -376,7 +376,7 @@ function CardStep({
 
       <div className="mt-5 flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
-          <span className="meta">handle · {SITE_HOST}/@{card.handle || "you"}</span>
+          <span className="meta">handle · {CARD_HOST}/@{card.handle || "you"}</span>
           <div className={`flex items-center rounded-[var(--radius-md)] border border-line bg-surface pl-4 focus-within:border-line-strong ${ring("handle")}`}>
             <span className="text-ink-muted">@</span>
             <input value={card.handle} onChange={(e) => setCard((c) => ({ ...c, handle: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "") }))} maxLength={30} className="w-full bg-transparent px-1 py-3 outline-none" />

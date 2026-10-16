@@ -8,7 +8,7 @@ import { type City, CityPicker } from "@/components/city-picker";
 import { ListField } from "@/components/list-field";
 import { MarkdownField } from "@/components/markdown-field";
 import { type Sphere, SpherePicker } from "@/components/sphere-picker";
-import { SITE_HOST } from "@/lib/env";
+import { CARD_HOST } from "@/lib/env";
 import { fileToSquareJpeg } from "@/lib/image";
 import { LINK_KINDS, type LinkKey } from "@/lib/links";
 import { MAX_NEEDS } from "@/lib/needs";
@@ -149,12 +149,12 @@ export function ProfileEditor({ me, spheres, voice = false }: { me: Me; spheres:
           <input value={form.role} onChange={(e) => set("role", e.target.value)} maxLength={80} placeholder="e.g. founder, ai notes app" className={field} />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="meta">handle · {SITE_HOST}/@{form.handle || "you"}</span>
+          <span className="meta">handle · {CARD_HOST}/@{form.handle || "you"}</span>
           <div className="flex items-center rounded-[var(--radius-md)] border border-line bg-surface pl-4 focus-within:border-line-strong">
             <span className="text-ink-muted">@</span>
             <input value={form.handle} onChange={(e) => set("handle", e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))} maxLength={30} className="w-full bg-transparent px-1 py-3 outline-none" />
           </div>
-          {form.handle !== me.handle && <span className="text-xs text-fire-ink">links to {SITE_HOST}/@{me.handle} will stop working. your connections stay.</span>}
+          {form.handle !== me.handle && <span className="text-xs text-fire-ink">links to {CARD_HOST}/@{me.handle} will stop working. your connections stay.</span>}
         </label>
         <MarkdownField
           value={form.bio_md}

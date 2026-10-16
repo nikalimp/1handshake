@@ -3,7 +3,7 @@ import localFont from "next/font/local";
 import Script from "next/script";
 import "./globals.css";
 import { THEME_SCRIPT } from "@/lib/theme";
-import { SITE_URL } from "@/lib/env";
+import { APP_URL } from "@/lib/env";
 
 // Fonts are self-hosted (OFL): no requests to Google from members' browsers.
 const figtree = localFont({
@@ -21,7 +21,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
+  metadataBase: new URL(APP_URL),
   title: { default: "1handshake", template: "%s · 1handshake" },
   description: "A members-only club for people in tech. Everyone you need is one handshake away.",
   icons: { icon: "/1h-app-icon.svg" },
