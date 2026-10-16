@@ -213,7 +213,21 @@ function CardStep({
   const [agree, setAgree] = useState(false);
   const [today] = useState(() => new Date().toISOString().slice(0, 10));
   const [error, setError] = useState<string | null>(null);
+  const [checked, setChecked] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  // What still blocks joining. The button stays clickable and says what's missing,
+  // instead of sitting grey without a reason.
+  const missing = [
+    !card.name.trim() && ["name", "your name"],
+    !card.role.trim() && ["role", "what you do"],
+    card.handle.length < 2 && ["handle", "a handle"],
+    !cityId && ["city", "your city"],
+    !agree && ["agree", "the agreement tick"],
+  ].filter((m): m is [string, string] => Boolean(m));
+  const bad = (k: string) => checked && missing.some(([key]) => key === k);
+  const ring = (k: string) => (bad(k) ? "ring-2 ring-fire ring-offset-2 ring-offset-surface" : "");
+  const notice = checked && missing.length ? `almost there — add ${missing.map(([, label]) => label).join(", ")}.` : error;
 
   const set = (k: keyof CardFields) => (e: { target: { value: string } }) => setCard((c) => ({ ...c, [k]: e.target.value }));
 
@@ -234,13 +248,16 @@ function CardStep({
     }
   };
 
-  const join = () =>
+  const join = () => {
+    setChecked(true);
+    if (missing.length) return;
     startTransition(async () => {
       setError(null);
       const res = await joinClub({ code, ...card, city_id: Number(cityId), birth_date: birth || null, avatar_path: avatar?.path ?? null });
       if ("error" in res) setError(res.error);
       else onJoined();
     });
+  };
 
   const field = "w-full rounded-[var(--radius-md)] border border-line bg-surface px-4 py-3 outline-none focus:border-line-strong";
 
@@ -271,10 +288,17 @@ function CardStep({
           }}
         />
         <div className="flex flex-col gap-1">
-          <input aria-label="name" value={card.name} onChange={set("name")} placeholder="your name" maxLength={80} className="bg-transparent text-[26px] leading-8 font-extrabold tracking-[-0.02em] lowercase outline-none" />
+          <input aria-label="name" value={card.name} onChange={set("name")} placeholder="your name" maxLength={80} className={`rounded-md bg-transparent text-[26px] leading-8 font-extrabold tracking-[-0.02em] lowercase outline-none ${ring("name")}`} />
           <div className="flex items-baseline gap-1.5 text-ink-muted">
             <span aria-hidden>—</span>
-            <input aria-label="what you do" value={card.role} onChange={set("role")} placeholder="what you do" maxLength={80} className="w-full bg-transparent text-[17px] font-semibold lowercase outline-none" />
+            <input
+              aria-label="what you do"
+              value={card.role}
+              onChange={set("role")}
+              placeholder="what you do, e.g. founder, ai notes app"
+              maxLength={80}
+              className={`w-full rounded-md bg-transparent text-[17px] font-semibold lowercase outline-none placeholder:font-normal ${card.role.trim() ? "" : "border-b border-dashed border-line-strong"} ${ring("role")}`}
+            />
           </div>
         </div>
 
@@ -297,14 +321,14 @@ function CardStep({
       <div className="mt-5 flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
           <span className="meta">handle · 1handshake.com/@{card.handle || "you"}</span>
-          <div className="flex items-center rounded-[var(--radius-md)] border border-line bg-surface pl-4 focus-within:border-line-strong">
+          <div className={`flex items-center rounded-[var(--radius-md)] border border-line bg-surface pl-4 focus-within:border-line-strong ${ring("handle")}`}>
             <span className="text-ink-muted">@</span>
             <input value={card.handle} onChange={(e) => setCard((c) => ({ ...c, handle: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "") }))} maxLength={30} className="w-full bg-transparent px-1 py-3 outline-none" />
           </div>
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="meta">city</span>
-          <select value={cityId} onChange={(e) => setCityId(e.target.value ? Number(e.target.value) : "")} className={field} required>
+          <select value={cityId} onChange={(e) => setCityId(e.target.value ? Number(e.target.value) : "")} className={`${field} ${ring("city")}`} required>
             <option value="">pick your city</option>
             {cities.map((c) => (
               <option key={c.id} value={c.id}>
@@ -318,7 +342,7 @@ function CardStep({
           <input type="date" value={birth} onChange={(e) => setBirth(e.target.value)} max={today} className={field} />
         </label>
         <label className="flex items-start gap-3 text-sm">
-          <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--fire)]" />
+          <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className={`mt-0.5 h-5 w-5 shrink-0 rounded accent-[var(--fire)] ${ring("agree")}`} />
           <span>
             i agree to the{" "}
             <Link href="/terms" target="_blank" className="underline underline-offset-2">
@@ -331,12 +355,12 @@ function CardStep({
             . my card is public; my network stays private.
           </span>
         </label>
-        {error && (
+        {notice && (
           <p role="alert" className="rounded-[var(--radius-md)] bg-fire-soft px-4 py-3 text-sm text-fire-ink">
-            {error}
+            {notice}
           </p>
         )}
-        <Button className="w-full" disabled={!agree || pending || uploading || !cityId || !card.name.trim() || !card.role.trim() || card.handle.length < 2} onClick={join}>
+        <Button className="w-full" disabled={pending || uploading} onClick={join}>
           {pending ? "joining…" : "join the club"}
         </Button>
         <Button variant="ghost" size="sm" className="self-center" onClick={onBack} disabled={pending}>
