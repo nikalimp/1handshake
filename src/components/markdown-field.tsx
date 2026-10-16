@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { Markdown } from "@/components/markdown";
+import { useRecorder } from "@/lib/use-recorder";
 
 type Edit = { value: string; start: number; end: number };
 
@@ -55,6 +56,7 @@ export function MarkdownField({
   maxLength = 4000,
   label = "about",
   defaultView = "write",
+  onVoice,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -62,9 +64,24 @@ export function MarkdownField({
   maxLength?: number;
   label?: string;
   defaultView?: "write" | "preview";
+  /** Voice edit: what was said → the new text (null = couldn't rewrite; the words are appended instead). */
+  onVoice?: (spoken: string) => Promise<string | null>;
 }) {
   const area = useRef<HTMLTextAreaElement>(null);
   const [view, setView] = useState<"write" | "preview">(defaultView);
+  const [rewriting, setRewriting] = useState(false);
+  const [undo, setUndo] = useState<string | null>(null);
+  const voice = useRecorder(async (spoken) => {
+    if (!onVoice) return;
+    setRewriting(true);
+    const before = value;
+    const next = await onVoice(spoken).catch(() => null);
+    onChange((next ?? `${before.trim()}${before.trim() ? "\n\n" : ""}${spoken}`).slice(0, maxLength));
+    setUndo(before);
+    setRewriting(false);
+  }, 120);
+  const listening = voice.state === "recording";
+  const working = voice.state === "transcribing" || rewriting;
 
   const apply = (run: (e: Edit) => Edit) => {
     const el = area.current;
@@ -93,6 +110,19 @@ export function MarkdownField({
       {view === "write" ? (
         <div className="overflow-hidden rounded-[var(--radius-md)] border border-line bg-surface focus-within:border-line-strong">
           <div className="flex flex-wrap gap-0.5 border-b border-line p-1" role="toolbar" aria-label="formatting">
+            {onVoice && voice.supported && (
+              <button
+                type="button"
+                title="edit with your voice"
+                aria-label={listening ? "stop recording" : "edit with your voice"}
+                aria-pressed={listening}
+                disabled={working}
+                onClick={() => (listening ? voice.stop() : void voice.start())}
+                className={`order-last ml-auto flex h-8 items-center gap-1.5 rounded-full px-3 text-sm font-semibold ${listening ? "bg-ink text-paper" : "bg-fire-soft text-fire-ink"} disabled:opacity-60`}
+              >
+                {working ? "rewriting…" : listening ? `● ${Math.floor(voice.seconds / 60)}:${String(voice.seconds % 60).padStart(2, "0")} stop` : "🎙 say it"}
+              </button>
+            )}
             {TOOLS.map((t) => (
               <button
                 key={t.title}
@@ -122,6 +152,24 @@ export function MarkdownField({
           {value.trim() ? <Markdown source={value} /> : <p className="text-ink-muted">nothing here yet</p>}
         </div>
       )}
+      {(undo !== null || voice.error) && (
+        <p className="flex items-center justify-between gap-3 px-1 text-sm">
+          <span className={voice.error ? "text-fire-ink" : "text-ink-muted"}>{voice.error ?? "rewritten from your voice"}</span>
+          {undo !== null && !voice.error && (
+            <button
+              type="button"
+              className="font-semibold underline underline-offset-2"
+              onClick={() => {
+                onChange(undo);
+                setUndo(null);
+              }}
+            >
+              undo
+            </button>
+          )}
+        </p>
+      )}
+      {onVoice && voice.supported && undo === null && !voice.error && !listening && !working && <p className="meta px-1">tip: tap 🎙 and say what to change — “add that i mentor founders”</p>}
     </div>
   );
 }

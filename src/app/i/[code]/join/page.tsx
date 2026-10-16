@@ -24,7 +24,10 @@ export default async function Join(props: PageProps<"/i/[code]/join">) {
   const problem = inviteProblem(inv);
   if (!inv || problem) return <InviteProblem title={problem ?? "this code doesn't exist"} />;
 
-  const guess = await guessCity(supabase);
+  const [guess, { data: spheres }] = await Promise.all([
+    guessCity(supabase),
+    supabase.from("spheres").select("id, parent_id, name").order("id").returns<{ id: number; parent_id: number | null; name: string }[]>(),
+  ]);
   const meta = user.user_metadata as { full_name?: string; name?: string };
   const googleName = meta.full_name ?? meta.name ?? "";
 
@@ -35,6 +38,7 @@ export default async function Join(props: PageProps<"/i/[code]/join">) {
       inviterName={inv.inviter_name ?? "your inviter"}
       guess={guess}
       serverVoice={hasGemini()}
+      spheres={spheres ?? []}
       defaults={{ name: googleName, handle: handleFrom(googleName || (user.email ?? "").split("@")[0]) }}
     />
   );

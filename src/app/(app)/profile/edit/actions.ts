@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { reviseCard } from "@/lib/ai-card";
 import { getMe } from "@/lib/data";
 import { MAX_NEEDS } from "@/lib/needs";
 import { LINK_KINDS, type LinkKey, type Links, normalizeLink } from "@/lib/links";
@@ -90,4 +91,13 @@ export async function saveProfile(input: ProfileInput): Promise<{ ok: true } | {
   revalidatePath("/connect");
   revalidatePath("/graph");
   return { ok: true };
+}
+
+/** Voice edit of my card: what I said → the updated card text (not saved until I press save). */
+export async function reviseBio(bio: string, spoken: string): Promise<{ bio: string } | { error: string }> {
+  const me = await getMe();
+  if (!me) return { error: "members only" };
+  if (!spoken.trim()) return { error: "didn't catch that" };
+  const next = await reviseCard(bio, spoken);
+  return next ? { bio: next } : { error: "couldn't rewrite the card right now — your words were added at the end instead" };
 }

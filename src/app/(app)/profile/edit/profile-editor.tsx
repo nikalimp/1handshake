@@ -1,19 +1,19 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/avatar";
 import { Button, buttonClass } from "@/components/button";
 import { type City, CityPicker } from "@/components/city-picker";
-import { Combobox, type Option } from "@/components/combobox";
 import { ListField } from "@/components/list-field";
 import { MarkdownField } from "@/components/markdown-field";
+import { type Sphere, SpherePicker } from "@/components/sphere-picker";
 import { SITE_HOST } from "@/lib/env";
 import { fileToSquareJpeg } from "@/lib/image";
 import { LINK_KINDS, type LinkKey } from "@/lib/links";
 import { MAX_NEEDS } from "@/lib/needs";
 import { createClient } from "@/lib/supabase/client";
-import { saveProfile } from "./actions";
+import { reviseBio, saveProfile } from "./actions";
 
 type Me = {
   id: string;
@@ -32,7 +32,6 @@ type Me = {
   needs: string[];
   cans: string[];
 };
-type Sphere = { id: number; parent_id: number | null; name: string };
 
 const field = "w-full rounded-[var(--radius-md)] border border-line bg-surface px-4 py-3 outline-none focus:border-line-strong";
 
@@ -54,7 +53,7 @@ function Toggle({ on, onChange, disabled, label, hint }: { on: boolean; onChange
   );
 }
 
-export function ProfileEditor({ me, spheres }: { me: Me; spheres: Sphere[] }) {
+export function ProfileEditor({ me, spheres, voice = false }: { me: Me; spheres: Sphere[]; voice?: boolean }) {
   const router = useRouter();
   const [supabase] = useState(createClient);
   const file = useRef<HTMLInputElement>(null);
@@ -63,21 +62,6 @@ export function ProfileEditor({ me, spheres }: { me: Me; spheres: Sphere[] }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [today] = useState(() => new Date().toISOString().slice(0, 10));
-
-  const sphereName = useMemo(() => new Map(spheres.map((s) => [s.id, s.name])), [spheres]);
-  const searchSpheres = useCallback(
-    (q: string): Option[] => {
-      const term = q.trim().toLowerCase();
-      const parents = spheres.filter((p) => p.parent_id === null);
-      return parents.flatMap((p) =>
-        spheres
-          .filter((s) => s.parent_id === p.id && (!term || s.name.toLowerCase().includes(term) || p.name.toLowerCase().includes(term)))
-          .sort((a, b) => Number(!a.name.toLowerCase().startsWith(term)) - Number(!b.name.toLowerCase().startsWith(term)))
-          .map((s) => ({ id: s.id, label: s.name, group: p.name, disabled: form.spheres.includes(s.id), hint: form.spheres.includes(s.id) ? "added" : undefined })),
-      );
-    },
-    [spheres, form.spheres],
-  );
 
   const set = <K extends keyof Me>(k: K, v: Me[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -172,7 +156,18 @@ export function ProfileEditor({ me, spheres }: { me: Me; spheres: Sphere[] }) {
           </div>
           {form.handle !== me.handle && <span className="text-xs text-fire-ink">links to {SITE_HOST}/@{me.handle} will stop working. your connections stay.</span>}
         </label>
-        <MarkdownField value={form.bio_md} onChange={(v) => set("bio_md", v)} />
+        <MarkdownField
+          value={form.bio_md}
+          onChange={(v) => set("bio_md", v)}
+          onVoice={
+            voice
+              ? async (spoken) => {
+                  const res = await reviseBio(form.bio_md, spoken);
+                  return "bio" in res ? res.bio : null;
+                }
+              : undefined
+          }
+        />
       </section>
 
       <section className="flex flex-col gap-5 rounded-[var(--radius-lg)] bg-surface p-5 shadow-[var(--shadow-card)]" aria-label="i need and i can">
@@ -219,26 +214,7 @@ export function ProfileEditor({ me, spheres }: { me: Me; spheres: Sphere[] }) {
           <p className="font-semibold">what you work in</p>
           <p className="text-sm text-ink-muted">up to 3 · ★ is your main one, tap another to make it main · members filter the graph by it</p>
         </div>
-        {form.spheres.length > 0 && (
-          <ul className="flex flex-wrap gap-1.5">
-            {form.spheres.map((id, i) => (
-              <li key={id} className={`flex items-center rounded-full text-sm ${i === 0 ? "bg-fire font-semibold text-on-fire" : "bg-surface-sunk"}`}>
-                <button type="button" disabled={i === 0} onClick={() => set("spheres", [id, ...form.spheres.filter((x) => x !== id)])} className="py-1.5 pl-3" title={i === 0 ? "your main sphere" : "make it main"}>
-                  {i === 0 && "★ "}
-                  {sphereName.get(id)}
-                </button>
-                <button type="button" aria-label={`remove ${sphereName.get(id)}`} onClick={() => set("spheres", form.spheres.filter((x) => x !== id))} className="py-1.5 pr-3 pl-2 opacity-70 hover:opacity-100">
-                  ✕
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {form.spheres.length < 3 ? (
-          <Combobox label="add a sphere" placeholder={form.spheres.length ? "add another, e.g. product, ios, seo" : "type, e.g. product, ios, seo"} value={null} clearOnSelect onChange={(o) => o && set("spheres", [...form.spheres, o.id])} search={searchSpheres} className={field} />
-        ) : (
-          <p className="meta">that&apos;s 3 · remove one to pick another</p>
-        )}
+        <SpherePicker value={form.spheres} onChange={(v) => set("spheres", v)} spheres={spheres} />
       </section>
 
       <section className="flex flex-col divide-y divide-line rounded-[var(--radius-lg)] bg-surface px-5 py-2 shadow-[var(--shadow-card)]">

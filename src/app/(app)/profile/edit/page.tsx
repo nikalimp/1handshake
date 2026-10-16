@@ -5,6 +5,7 @@ import { PushCard } from "@/components/push-card";
 import { ThemeSwitch } from "@/components/theme-switch";
 import { requireMe } from "@/lib/data";
 import { signedUrls } from "@/lib/files";
+import { hasGemini } from "@/lib/gemini";
 import { guessCity } from "@/lib/geo";
 import { cleanLinks, LINK_KINDS, linkLabel } from "@/lib/links";
 import { createClient } from "@/lib/supabase/server";
@@ -47,6 +48,7 @@ export default async function EditProfilePage() {
           spheres: (mine ?? []).sort((a, b) => Number(b.is_primary) - Number(a.is_primary)).map((s) => s.sphere_id),
         }}
         spheres={spheres ?? []}
+        voice={hasGemini()}
       />
       <section className="mt-5 flex flex-col divide-y divide-line rounded-[var(--radius-lg)] bg-surface px-5 py-2 shadow-[var(--shadow-card)]" aria-label="this device">
         <PushCard variant="row" />

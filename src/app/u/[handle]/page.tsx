@@ -7,6 +7,7 @@ import { Logo } from "@/components/logo";
 import { Markdown, plainText } from "@/components/markdown";
 import { SocialLinks } from "@/components/social-links";
 import { cardToMarkdown, getCardByHandle } from "@/lib/cards";
+import { getMe } from "@/lib/data";
 import { SITE_HOST } from "@/lib/env";
 import { signedUrls } from "@/lib/files";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -31,6 +32,7 @@ export default async function VisitCard(props: PageProps<"/u/[handle]">) {
   if (!card) notFound();
 
   const supabase = await createClient();
+  const viewer = await getMe();
   const { data: countRows } = await supabase.rpc("needs_count", { p_profile: card.id });
   const counts = ((countRows ?? [])[0] as { needs: number; cans: number } | undefined) ?? { needs: 0, cans: 0 };
 
@@ -68,7 +70,13 @@ export default async function VisitCard(props: PageProps<"/u/[handle]">) {
           </div>
         )}
         <pre className="rounded-[var(--radius-sm)] border border-dashed border-line-strong p-3 font-mono text-xs leading-[18px] whitespace-pre-wrap text-ink-muted">{cardToMarkdown(card)}</pre>
-        <Link href="/" className={buttonClass("primary")}>how to join</Link>
+        {viewer ? (
+          <Link href={viewer.id === card.id ? "/profile" : `/people/${card.handle}`} className={buttonClass("primary")}>
+            {viewer.id === card.id ? "open my profile" : "open in the club"}
+          </Link>
+        ) : (
+          <Link href="/" className={buttonClass("primary")}>how to join</Link>
+        )}
       </article>
       <p className="meta text-center">{SITE_HOST}/@{card.handle} · <Link href={`/@${card.handle}/llms.txt`}>llms.txt</Link></p>
     </main>

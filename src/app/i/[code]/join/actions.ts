@@ -1,5 +1,6 @@
 "use server";
 import { draftCard, type DraftCard } from "@/lib/ai-card";
+import { MAX_NEEDS } from "@/lib/needs";
 import { createClient } from "@/lib/supabase/server";
 
 async function signedInUser() {
@@ -9,12 +10,17 @@ async function signedInUser() {
 }
 
 /** Voice/text intro → draft card (Claude when ANTHROPIC_API_KEY is set, otherwise the transcript as is). */
-export async function makeCard(code: string, transcript: string): Promise<(DraftCard & { ai: boolean }) | { error: string }> {
+export async function makeCard(code: string, transcript: string): Promise<(DraftCard & { ai: boolean; sphereIds: number[] }) | { error: string }> {
   const { supabase, user } = await signedInUser();
   if (!user) return { error: "sign in with google first" };
   await supabase.rpc("set_guest_step", { p_code: code, p_step: "card" });
   const meta = user.user_metadata as { full_name?: string; name?: string };
-  return draftCard(transcript, meta.full_name ?? meta.name ?? "", user.email ?? "");
+  const { data: spheres } = await supabase.from("spheres").select("id, name, parent_id").not("parent_id", "is", null).returns<{ id: number; name: string }[]>();
+  const card = await draftCard(transcript, meta.full_name ?? meta.name ?? "", user.email ?? "", (spheres ?? []).map((s) => s.name));
+  // Sphere names from the AI → ids (unknown names are dropped).
+  const byName = new Map((spheres ?? []).map((s) => [s.name.toLowerCase(), s.id]));
+  const sphereIds = [...new Set(card.spheres.map((n) => byName.get(n.toLowerCase())).filter((x): x is number => typeof x === "number"))].slice(0, 3);
+  return { ...card, sphereIds };
 }
 
 export type JoinInput = {
@@ -27,6 +33,9 @@ export type JoinInput = {
   birth_date: string | null;
   avatar_path: string | null;
   agreed: boolean;
+  spheres: number[];
+  needs: string[];
+  cans: string[];
 };
 
 /** Creates the profile, the 🤝 connection with the inviter and uses up the code — all or nothing. */
@@ -58,6 +67,15 @@ export async function joinClub(input: JoinInput): Promise<{ ok: true } | { error
   }
   if (input.avatar_path?.startsWith(`${user.id}/`)) {
     await supabase.from("profiles").update({ avatar_path: input.avatar_path }).eq("id", user.id);
+  }
+  // Spheres and i need / i can, if any (the member can change them later in their profile).
+  const picked = [...new Set(input.spheres)].slice(0, 3);
+  if (picked.length) await supabase.from("profile_spheres").insert(picked.map((sphere_id, i) => ({ profile_id: user.id, sphere_id, is_primary: i === 0 })));
+  const tidy = (l: string[]) => [...new Set(l.map((x) => x.trim()).filter(Boolean))].slice(0, MAX_NEEDS).map((x) => x.slice(0, 200));
+  const rows = [...tidy(input.needs).map((body) => ({ kind: "need", body })), ...tidy(input.cans).map((body) => ({ kind: "can", body }))];
+  if (rows.length) {
+    const t = Date.now();
+    await supabase.from("needs_offers").insert(rows.map((r, i) => ({ ...r, profile_id: user.id, created_at: new Date(t + i).toISOString() })));
   }
   // Photos tried and replaced during registration aren't needed anymore.
   const { data: files } = await supabase.storage.from("avatars").list(user.id, { limit: 100 });

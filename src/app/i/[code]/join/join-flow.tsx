@@ -7,9 +7,12 @@ import { Button } from "@/components/button";
 import { type City, CityPicker } from "@/components/city-picker";
 import { Confetti } from "@/components/confetti";
 import { Logo } from "@/components/logo";
+import { ListField } from "@/components/list-field";
 import { MarkdownField } from "@/components/markdown-field";
+import { type Sphere, SpherePicker } from "@/components/sphere-picker";
 import { SITE_HOST } from "@/lib/env";
 import { fileToSquareJpeg } from "@/lib/image";
+import { MAX_NEEDS } from "@/lib/needs";
 import { createClient } from "@/lib/supabase/client";
 import { joinClub, makeCard, markStep } from "./actions";
 
@@ -17,10 +20,10 @@ type Step = "about" | "drafting" | "card" | "in";
 
 const PROMPTS = ["who you are", "what you do", "what you need", "what you can help with"];
 
-export function JoinFlow({ code, uid, inviterName, defaults, guess, serverVoice }: { code: string; uid: string; inviterName: string; defaults: { name: string; handle: string }; guess: City | null; serverVoice: boolean }) {
+export function JoinFlow({ code, uid, inviterName, defaults, guess, serverVoice, spheres }: { code: string; uid: string; inviterName: string; defaults: { name: string; handle: string }; guess: City | null; serverVoice: boolean; spheres: Sphere[] }) {
   const [step, setStep] = useState<Step>("about");
   const [transcript, setTranscript] = useState("");
-  const [card, setCard] = useState({ name: defaults.name, role: "", handle: defaults.handle, bio_md: "" });
+  const [card, setCard] = useState<CardFields>({ name: defaults.name, role: "", handle: defaults.handle, bio_md: "", spheres: [], needs: [], cans: [] });
   const [ai, setAi] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,7 +40,7 @@ export function JoinFlow({ code, uid, inviterName, defaults, guess, serverVoice 
       setStep("about");
       return;
     }
-    setCard({ name: res.name || defaults.name, role: res.role, handle: res.handle || defaults.handle, bio_md: res.bio_md });
+    setCard({ name: res.name || defaults.name, role: res.role, handle: res.handle || defaults.handle, bio_md: res.bio_md, spheres: res.sphereIds, needs: res.needs, cans: res.cans });
     setAi(res.ai);
     setStep("card");
   };
@@ -53,7 +56,7 @@ export function JoinFlow({ code, uid, inviterName, defaults, guess, serverVoice 
         </div>
       )}
       {step === "card" && (
-        <CardStep code={code} uid={uid} card={card} setCard={setCard} ai={ai} guess={guess} onBack={() => setStep("about")} onJoined={() => setStep("in")} />
+        <CardStep code={code} uid={uid} card={card} setCard={setCard} ai={ai} guess={guess} spheres={spheres} onBack={() => setStep("about")} onJoined={() => setStep("in")} />
       )}
       {step === "in" && <YoureIn inviterName={inviterName} />}
     </main>
@@ -269,7 +272,7 @@ function AboutStep({
 
 // --- Step 2: your card -------------------------------------------------------------------------
 
-type CardFields = { name: string; role: string; handle: string; bio_md: string };
+type CardFields = { name: string; role: string; handle: string; bio_md: string; spheres: number[]; needs: string[]; cans: string[] };
 
 function CardStep({
   code,
@@ -278,6 +281,7 @@ function CardStep({
   setCard,
   ai,
   guess,
+  spheres,
   onBack,
   onJoined,
 }: {
@@ -287,6 +291,7 @@ function CardStep({
   setCard: (f: (c: CardFields) => CardFields) => void;
   ai: boolean;
   guess: City | null;
+  spheres: Sphere[];
   onBack: () => void;
   onJoined: () => void;
 }) {
@@ -315,7 +320,7 @@ function CardStep({
   const ring = (k: string) => (bad(k) ? "ring-2 ring-fire ring-offset-2 ring-offset-surface" : "");
   const notice = checked && missing.length ? `almost there — add ${missing.map(([, label]) => label).join(", ")}.` : error;
 
-  const set = (k: keyof CardFields) => (e: { target: { value: string } }) => setCard((c) => ({ ...c, [k]: e.target.value }));
+  const set = (k: "name" | "role") => (e: { target: { value: string } }) => setCard((c) => ({ ...c, [k]: e.target.value }));
 
   const pickPhoto = async (f: File) => {
     setUploading(true);
@@ -399,6 +404,18 @@ function CardStep({
 
         <MarkdownField value={card.bio_md} onChange={(v) => setCard((c) => ({ ...c, bio_md: v }))} defaultView="preview" />
       </article>
+
+      <section className="mt-4 flex flex-col gap-5 rounded-[var(--radius-lg)] bg-surface p-5 shadow-[var(--shadow-card)]" aria-label="what you work in, need and can">
+        <div className="flex flex-col gap-3">
+          <div>
+            <p className="font-semibold">what you work in</p>
+            <p className="text-sm text-ink-muted">up to 3 · ★ is your main one · members filter the graph by it</p>
+          </div>
+          <SpherePicker value={card.spheres} onChange={(v) => setCard((c) => ({ ...c, spheres: v }))} spheres={spheres} />
+        </div>
+        <ListField label="i need" hint="members see it, and connect shows you people who can help" items={card.needs} onChange={(v) => setCard((c) => ({ ...c, needs: v }))} max={MAX_NEEDS} placeholder="e.g. a backend engineer" />
+        <ListField label="i can" items={card.cans} onChange={(v) => setCard((c) => ({ ...c, cans: v }))} max={MAX_NEEDS} placeholder="e.g. review your pitch deck" />
+      </section>
 
       <div className="mt-5 flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
