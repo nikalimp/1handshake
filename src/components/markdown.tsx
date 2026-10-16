@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 // Builds React elements (no raw HTML), so a card can't inject markup.
 
 // Underscore emphasis is left out on purpose: it would mangle handles like @anna_kim_dev.
-const INLINE = /\*\*(.+?)\*\*|~~(.+?)~~|`([^`]+)`|\*([^*\s][^*]*?)\*|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+const INLINE = /\*\*(.+?)\*\*|~~(.+?)~~|`([^`]+)`|\*([^*\s][^*]*?)\*|\[([^\]]+)\]\(((?:https?:\/\/|mailto:|\/(?!\/))[^\s)]*)\)/g;
 
 function inline(text: string, key: string): ReactNode[] {
   const out: ReactNode[] = [];
@@ -22,7 +22,7 @@ function inline(text: string, key: string): ReactNode[] {
     else if (m[4]) out.push(<em key={k}>{inline(m[4], k)}</em>);
     else
       out.push(
-        <a key={k} href={m[6]} target="_blank" rel="noopener noreferrer nofollow" className="underline decoration-line-strong underline-offset-2 hover:decoration-current">
+        <a key={k} href={m[6]} {...(m[6].startsWith("http") ? { target: "_blank", rel: "noopener noreferrer nofollow" } : {})} className="underline decoration-line-strong underline-offset-2 hover:decoration-current">
           {m[5]}
         </a>,
       );

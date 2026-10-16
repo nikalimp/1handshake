@@ -1,14 +1,8 @@
-import { LegalDraft } from "@/components/legal-draft";
+import { LegalPage } from "@/components/legal-page";
 
-export const metadata = { title: "terms" };
+export const dynamic = "force-static";
+export const metadata = { title: "Terms of Service", description: "The rules of 1handshake, a members-only networking club for people in tech." };
 
 export default function Terms() {
-  return (
-    <LegalDraft title="terms">
-      <p>1handshake is a members-only club. you join only through an in-person handshake with a member.</p>
-      <p>be real: one account per person, your own name and photo, no spam, no scraping, no selling access to your network.</p>
-      <p>your visit card is public and can be indexed by search engines and ai assistants. your connections and requests stay inside the club.</p>
-      <p>you can leave any time: your personal data is erased and your node stays as an anonymous 👻 so other members&apos; intro chains don&apos;t break.</p>
-    </LegalDraft>
-  );
+  return <LegalPage name="terms" />;
 }
