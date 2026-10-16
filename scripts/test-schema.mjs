@@ -19,6 +19,7 @@ await db.exec(`
   grant execute on function auth.uid() to anon, authenticated;
 `);
 await db.exec(readFileSync("supabase/migrations/20261016000000_init.sql", "utf8"));
+await db.exec(readFileSync("supabase/migrations/20261016000200_invite_flow.sql", "utf8"));
 await db.exec(readFileSync("supabase/seed.sql", "utf8"));
 // No broad grants here: the migration's own grants must be enough ("auto-expose tables" off).
 
@@ -135,5 +136,29 @@ const ghost = (await sql(`select name, status from profiles where id = $1`, [ids
 assert.deepEqual(ghost, { name: null, status: "ghost" });
 assert.equal((await sql(`select is_connected($1,$2) c`, [ids.nik, ids.kate])).rows[0].c, true);
 console.log("✓ ghost: personal data erased, the edge stays");
+
+// 6. A member scans another member's code → instant 🤝, no registration
+await as("nik");
+const inv3 = (await sql(`select * from create_invite(null)`)).rows[0];
+await assert.rejects(sql(`select handshake_with_invite($1)`, [inv3.code]), /your own code/);
+await as("david");
+assert.equal((await sql(`select is_connected($1,$2) c`, [ids.nik, ids.david])).rows[0].c, false);
+assert.equal((await sql(`select handshake_with_invite($1) id`, [inv3.code])).rows[0].id, ids.nik);
+assert.equal((await sql(`select is_connected($1,$2) c`, [ids.nik, ids.david])).rows[0].c, true);
+await assert.rejects(sql(`select handshake_with_invite($1)`, [inv3.code]), /no longer valid/);
+await as(null, "anon");
+await assert.rejects(sql(`select handshake_with_invite($1)`, [inv3.code]), /permission denied/);
+console.log("✓ member scans a member's code → 🤝 connected, code used up");
+
+// 7. Cancel: only the inviter, only live/scanned codes
+await as("nik");
+const inv4 = (await sql(`select * from create_invite(null)`)).rows[0];
+await as("ivan");
+await sql(`select cancel_invite($1)`, [inv4.id]);
+await as("nik");
+assert.equal((await sql(`select status from invites where id = $1`, [inv4.id])).rows[0].status, "live");
+await sql(`select cancel_invite($1)`, [inv4.id]);
+assert.equal((await sql(`select status from invites where id = $1`, [inv4.id])).rows[0].status, "cancelled");
+console.log("✓ cancel invite: inviter only");
 
 console.log("\nall schema checks passed");

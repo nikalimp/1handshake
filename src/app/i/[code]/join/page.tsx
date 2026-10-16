@@ -1,13 +1,38 @@
+import { redirect } from "next/navigation";
+import { InviteProblem } from "@/components/invite-problem";
+import { handleFrom } from "@/lib/ai-card";
+import { getMe } from "@/lib/data";
+import { inviteProblem, openInvite } from "@/lib/invites";
+import { createClient } from "@/lib/supabase/server";
+import { JoinFlow } from "./join-flow";
+
 export const metadata = { title: "tell us about yourself", robots: { index: false } };
 
-// Next build step: voice → transcript → AI card → accept_invite() → confetti → feed.
+// After Google sign-in: voice → transcript → AI card → accept_invite() → confetti → feed.
 // Interaction reference: Product/prototype/invite-join.html
 export default async function Join(props: PageProps<"/i/[code]/join">) {
   const { code } = await props.params;
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  const user = data.user;
+  if (!user) redirect(`/i/${code}`);
+  if (await getMe()) redirect(`/i/${code}`); // members get an instant handshake there
+
+  const inv = await openInvite(code);
+  const problem = inviteProblem(inv);
+  if (!inv || problem) return <InviteProblem title={problem ?? "this code doesn't exist"} />;
+
+  const { data: cities } = await supabase.from("cities").select("id, name").order("name").returns<{ id: number; name: string }[]>();
+  const meta = user.user_metadata as { full_name?: string; name?: string };
+  const googleName = meta.full_name ?? meta.name ?? "";
+
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col px-5 py-10">
-      <h1 className="text-[30px] leading-[34px] font-extrabold tracking-[-0.03em]">tell us about yourself</h1>
-      <p className="meta mt-2">registration for invite {code} — coming in the next build step</p>
-    </main>
+    <JoinFlow
+      code={code}
+      uid={user.id}
+      inviterName={inv.inviter_name ?? "your inviter"}
+      defaults={{ name: googleName, handle: handleFrom(googleName || (user.email ?? "").split("@")[0]) }}
+      cities={cities ?? []}
+    />
   );
 }

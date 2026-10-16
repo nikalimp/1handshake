@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { buttonClass } from "@/components/button";
 import { Logo } from "@/components/logo";
+import { Markdown } from "@/components/markdown";
 import { cardToMarkdown, getCardByHandle } from "@/lib/cards";
 
 export async function generateMetadata(props: PageProps<"/u/[handle]">): Promise<Metadata> {
@@ -44,7 +45,7 @@ export default async function VisitCard(props: PageProps<"/u/[handle]">) {
           {card.name} <span className="font-semibold text-ink-muted">— {card.role}</span>
         </h1>
         {card.cities?.name && <span className="meta">{card.cities.name}</span>}
-        <p className="whitespace-pre-line">{card.bio_md}</p>
+        {card.bio_md && <Markdown source={card.bio_md} />}
         <div className="relative overflow-hidden rounded-[var(--radius-md)] bg-surface-sunk p-4" aria-label="i need and i can — visible to members">
           <p className="blur-[5px] select-none" aria-hidden>i need: something specific. i can: help with something useful in return.</p>
           <span className="absolute inset-0 grid place-items-center text-sm font-semibold">🤝 visible to members</span>

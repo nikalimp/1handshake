@@ -1,14 +1,11 @@
-import { ScreenTitle } from "@/components/screen-title";
+import { requireMe } from "@/lib/data";
+import { InviteFlow } from "./invite-flow";
 
 export const metadata = { title: "invite" };
 
-// Next build step: selfie → create_invite() → QR with 5-minute timer → realtime waiting screen.
+// Selfie together → single-use QR for 5 minutes → live waiting screen → 🤝.
 // Interaction reference: Product/prototype/invite-join.html
-export default function InvitePage() {
-  return (
-    <>
-      <ScreenTitle title="invite" />
-      <p className="meta px-0.5">selfie + qr flow comes in the next build step</p>
-    </>
-  );
+export default async function InvitePage() {
+  const me = await requireMe();
+  return <InviteFlow uid={me.id} />;
 }

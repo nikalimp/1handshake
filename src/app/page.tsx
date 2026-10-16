@@ -16,9 +16,9 @@ export default async function Landing(props: PageProps<"/">) {
         <p className="text-ink-muted">
           a members-only club for people in tech. you get in only by meeting a member — in person, with a selfie to prove it.
         </p>
-        {error === "members-only" && (
+        {(error === "members-only" || error === "sign-in-failed") && (
           <p role="alert" className="rounded-[var(--radius-md)] bg-fire-soft px-4 py-3 text-sm text-fire-ink">
-            this google account isn&apos;t a member yet. ask a member for a handshake.
+            {error === "members-only" ? "this google account isn't a member yet. ask a member for a handshake." : "google sign-in didn't go through. try again."}
           </p>
         )}
       </div>
