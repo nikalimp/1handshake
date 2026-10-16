@@ -4,6 +4,7 @@ import type { City } from "@/components/city-picker";
 import { PushCard } from "@/components/push-card";
 import { ThemeSwitch } from "@/components/theme-switch";
 import { requireMe } from "@/lib/data";
+import { PRIVACY_URL, TERMS_URL } from "@/lib/env";
 import { signedUrls } from "@/lib/files";
 import { hasGemini } from "@/lib/gemini";
 import { guessCity } from "@/lib/geo";
@@ -71,7 +72,16 @@ export default async function EditProfilePage() {
         <form action="/auth/signout" method="post">
           <button className={buttonClass("secondary", "sm")}>sign out</button>
         </form>
-        <p className="meta">open source · v0.1.0</p>
+        <p className="meta">
+          <a href={TERMS_URL} target="_blank" rel="noopener" className="hover:text-ink">
+            terms
+          </a>{" "}
+          ·{" "}
+          <a href={PRIVACY_URL} target="_blank" rel="noopener" className="hover:text-ink">
+            privacy
+          </a>{" "}
+          · open source · v0.1.0
+        </p>
       </div>
     </>
   );

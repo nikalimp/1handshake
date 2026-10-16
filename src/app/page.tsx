@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { Logo } from "@/components/logo";
 import { SignInButton } from "@/components/sign-in-button";
 import { getMe } from "@/lib/data";
-import { isSupabaseConfigured } from "@/lib/env";
+import { isSupabaseConfigured, MAIN_URL, PRIVACY_URL, TERMS_URL } from "@/lib/env";
 
 export default async function Landing(props: PageProps<"/">) {
   const { error, bye } = await props.searchParams;
@@ -30,6 +30,19 @@ export default async function Landing(props: PageProps<"/">) {
           <p className="meta">set NEXT_PUBLIC_SUPABASE_URL and the publishable key to enable sign-in</p>
         )}
         <p className="meta text-center">members only · no waitlist · open source</p>
+        <p className="meta text-center">
+          <a href={MAIN_URL} target="_blank" rel="noopener" className="hover:text-ink">
+            what is 1handshake
+          </a>{" "}
+          ·{" "}
+          <a href={TERMS_URL} target="_blank" rel="noopener" className="hover:text-ink">
+            terms
+          </a>{" "}
+          ·{" "}
+          <a href={PRIVACY_URL} target="_blank" rel="noopener" className="hover:text-ink">
+            privacy
+          </a>
+        </p>
       </div>
     </main>
   );

@@ -15,6 +15,11 @@ export const CARD_URL = trim(process.env.NEXT_PUBLIC_CARD_URL ?? APP_URL);
 export const APP_HOST = host(APP_URL);
 export const CARD_HOST = host(CARD_URL);
 
+/** The main site: landing, Terms of Service, Privacy Policy. */
+export const MAIN_URL = trim(process.env.NEXT_PUBLIC_MAIN_URL ?? "https://1handshake.com");
+export const TERMS_URL = `${MAIN_URL}/terms`;
+export const PRIVACY_URL = `${MAIN_URL}/privacy`;
+
 /** @deprecated kept for older imports: the app's address. */
 export const SITE_URL = APP_URL;
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_KEY);

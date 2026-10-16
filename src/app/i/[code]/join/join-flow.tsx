@@ -1,5 +1,4 @@
 "use client";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { Avatar } from "@/components/avatar";
@@ -11,7 +10,7 @@ import { Progress } from "@/components/progress";
 import { ListField } from "@/components/list-field";
 import { MarkdownField } from "@/components/markdown-field";
 import { type Sphere, SpherePicker } from "@/components/sphere-picker";
-import { CARD_HOST } from "@/lib/env";
+import { CARD_HOST, PRIVACY_URL, TERMS_URL } from "@/lib/env";
 import { fileToSquareJpeg } from "@/lib/image";
 import { MAX_NEEDS } from "@/lib/needs";
 import { useRecorder } from "@/lib/use-recorder";
@@ -394,13 +393,13 @@ function CardStep({
           <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className={`mt-0.5 h-5 w-5 shrink-0 rounded accent-[var(--fire)] ${ring("agree")}`} />
           <span>
             i agree to the{" "}
-            <Link href="/terms" target="_blank" className="underline underline-offset-2">
+            <a href={TERMS_URL} target="_blank" rel="noopener" className="underline underline-offset-2">
               terms
-            </Link>{" "}
+            </a>{" "}
             and the{" "}
-            <Link href="/privacy" target="_blank" className="underline underline-offset-2">
+            <a href={PRIVACY_URL} target="_blank" rel="noopener" className="underline underline-offset-2">
               privacy policy
-            </Link>
+            </a>
             . my card is public; my network stays private.
           </span>
         </label>

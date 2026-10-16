@@ -5,11 +5,12 @@ import type { NextConfig } from "next";
 // address. Not in dev or on Vercel previews, which serve their own files.
 const assetPrefix = process.env.ASSET_PREFIX ?? (process.env.VERCEL_ENV === "production" ? "https://app.1handshake.com" : undefined);
 
-// Once the main site serves the cards (NEXT_PUBLIC_CARD_URL=https://1handshake.com), cards and legal pages
-// live only there: the app sends its own /@handle, /terms and /privacy over. The site proxies cards back
+// Once the main site serves the cards (NEXT_PUBLIC_CARD_URL=https://1handshake.com), cards live only there:
+// the app sends its own /@handle over. The site proxies cards back
 // to the app's internal /u/:handle path, so this never loops.
 const cardUrl = (process.env.NEXT_PUBLIC_CARD_URL ?? "").replace(/\/$/, "");
 const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "");
+const mainUrl = (process.env.NEXT_PUBLIC_MAIN_URL ?? "https://1handshake.com").replace(/\/$/, "");
 const cardsOnMainSite = Boolean(cardUrl) && cardUrl !== appUrl;
 
 const nextConfig: NextConfig = {
@@ -25,12 +26,16 @@ const nextConfig: NextConfig = {
     },
   },
   async redirects() {
-    if (!cardsOnMainSite) return [];
+    // Terms and Privacy live on the main site.
+    const legal = [
+      { source: "/terms", destination: `${mainUrl}/terms`, permanent: true },
+      { source: "/privacy", destination: `${mainUrl}/privacy`, permanent: true },
+    ];
+    if (!cardsOnMainSite) return legal;
     return [
+      ...legal,
       { source: "/@:handle/llms.txt", destination: `${cardUrl}/@:handle/llms.txt`, permanent: true },
       { source: "/@:handle", destination: `${cardUrl}/@:handle`, permanent: true },
-      { source: "/terms", destination: `${cardUrl}/terms`, permanent: true },
-      { source: "/privacy", destination: `${cardUrl}/privacy`, permanent: true },
     ];
   },
   // Public visit cards: /@handle (and /@handle/llms.txt) are served by /u/:handle.
