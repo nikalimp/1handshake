@@ -26,6 +26,7 @@ export type JoinInput = {
   city_id: number;
   birth_date: string | null;
   avatar_path: string | null;
+  agreed: boolean;
 };
 
 /** Creates the profile, the 🤝 connection with the inviter and uses up the code — all or nothing. */
@@ -33,6 +34,7 @@ export async function joinClub(input: JoinInput): Promise<{ ok: true } | { error
   const { supabase, user } = await signedInUser();
   if (!user) return { error: "sign in with google first" };
 
+  if (input.agreed !== true) return { error: "tick the agreement to join" };
   const handle = input.handle.trim().toLowerCase().replace(/^@/, "");
   if (!/^[a-z0-9_]{2,30}$/.test(handle)) return { error: "handle: 2–30 latin letters, digits or _" };
   if (!input.name.trim()) return { error: "add your name" };

@@ -253,7 +253,7 @@ function CardStep({
     if (missing.length) return;
     startTransition(async () => {
       setError(null);
-      const res = await joinClub({ code, ...card, city_id: Number(cityId), birth_date: birth || null, avatar_path: avatar?.path ?? null });
+      const res = await joinClub({ code, ...card, city_id: Number(cityId), birth_date: birth || null, avatar_path: avatar?.path ?? null, agreed: agree });
       if ("error" in res) setError(res.error);
       else onJoined();
     });
@@ -287,20 +287,26 @@ function CardStep({
             if (f) void pickPhoto(f);
           }}
         />
-        <div className="flex flex-col gap-1">
-          <input aria-label="name" value={card.name} onChange={set("name")} placeholder="your name" maxLength={80} className={`rounded-md bg-transparent text-[26px] leading-8 font-extrabold tracking-[-0.02em] lowercase outline-none ${ring("name")}`} />
-          <div className="flex items-baseline gap-1.5 text-ink-muted">
-            <span aria-hidden>—</span>
-            <input
-              aria-label="what you do"
-              value={card.role}
-              onChange={set("role")}
-              placeholder="what you do, e.g. founder, ai notes app"
-              maxLength={80}
-              className={`w-full rounded-md bg-transparent text-[17px] font-semibold lowercase outline-none placeholder:font-normal ${card.role.trim() ? "" : "border-b border-dashed border-line-strong"} ${ring("role")}`}
-            />
-          </div>
-        </div>
+        <label className="flex flex-col gap-1.5">
+          <span className="meta">name</span>
+          <input
+            value={card.name}
+            onChange={set("name")}
+            placeholder="your name"
+            maxLength={80}
+            className={`rounded-[var(--radius-sm)] bg-surface-sunk px-3 py-2 text-[24px] leading-8 font-extrabold tracking-[-0.02em] lowercase outline-none focus:shadow-[inset_0_0_0_1.5px_var(--line-strong)] ${ring("name")}`}
+          />
+        </label>
+        <label className="flex flex-col gap-1.5">
+          <span className="meta">what you do</span>
+          <input
+            value={card.role}
+            onChange={set("role")}
+            placeholder="e.g. founder, ai notes app"
+            maxLength={80}
+            className={`rounded-[var(--radius-sm)] bg-surface-sunk px-3 py-2.5 text-[17px] font-semibold lowercase outline-none placeholder:font-normal placeholder:text-ink-muted focus:shadow-[inset_0_0_0_1.5px_var(--line-strong)] ${ring("role")}`}
+          />
+        </label>
 
         <div className="flex flex-col gap-2">
           <div className="flex gap-1 self-start rounded-full bg-surface-sunk p-1 text-sm font-semibold" role="tablist">
@@ -360,7 +366,8 @@ function CardStep({
             {notice}
           </p>
         )}
-        <Button className="w-full" disabled={pending || uploading} onClick={join}>
+        {/* Looks inactive until everything required (consent included) is in place, but a tap still explains what's missing. */}
+        <Button className={`w-full ${missing.length ? "opacity-40" : ""}`} aria-disabled={missing.length > 0} disabled={pending || uploading} onClick={join}>
           {pending ? "joining…" : "join the club"}
         </Button>
         <Button variant="ghost" size="sm" className="self-center" onClick={onBack} disabled={pending}>
