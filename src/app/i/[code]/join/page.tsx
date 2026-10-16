@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { hasGemini } from "@/lib/gemini";
 import { guessCity } from "@/lib/geo";
 import { InviteProblem } from "@/components/invite-problem";
 import { handleFrom } from "@/lib/ai-card";
@@ -33,6 +34,7 @@ export default async function Join(props: PageProps<"/i/[code]/join">) {
       uid={user.id}
       inviterName={inv.inviter_name ?? "your inviter"}
       guess={guess}
+      serverVoice={hasGemini()}
       defaults={{ name: googleName, handle: handleFrom(googleName || (user.email ?? "").split("@")[0]) }}
     />
   );

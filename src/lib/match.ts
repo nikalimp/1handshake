@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash } from "node:crypto";
+import { geminiJson, hasGemini } from "@/lib/gemini";
 import type { createClient } from "@/lib/supabase/server";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -99,6 +100,27 @@ async function claudeMatches(me: Side, people: Candidate[], key: string): Promis
   }
 }
 
+async function geminiMatches(me: Side, people: Candidate[]): Promise<Matches | null> {
+  const payload = { me, people: people.map((p, i) => ({ id: String(i), role: p.role, needs: p.needs, cans: p.cans })) };
+  const res = await geminiJson<{ matches?: { id: string; why: string }[] }>({
+    system: SYSTEM,
+    prompt: JSON.stringify(payload),
+    schema: {
+      type: "OBJECT",
+      properties: { matches: { type: "ARRAY", items: { type: "OBJECT", properties: { id: { type: "STRING" }, why: { type: "STRING" } }, required: ["id", "why"] } } },
+      required: ["matches"],
+    },
+    timeoutMs: 15_000,
+  });
+  if (!res) return null;
+  const out: Matches = {};
+  for (const m of res.matches ?? []) {
+    const p = people[Number(m.id)];
+    if (p && typeof m.why === "string") out[p.id] = m.why.slice(0, 120);
+  }
+  return out;
+}
+
 /**
  * Who among these people matches my needs and offers. Claude when there's a key, keywords otherwise.
  * Results are cached per member until any input changes.
@@ -108,15 +130,15 @@ export async function findMatches(supabase: Supabase, meId: string, me: Side, pe
   if (!(me.needs.length || me.cans.length) || !withData.length) return {};
   const key = process.env.ANTHROPIC_API_KEY;
   const hash = createHash("sha256")
-    .update(JSON.stringify({ v: 1, ai: Boolean(key), me, people: withData }))
+    .update(JSON.stringify({ v: 1, ai: key ? "claude" : hasGemini() ? "gemini" : "words", me, people: withData }))
     .digest("hex");
 
   const { data: cached } = await supabase.from("match_cache").select("input_hash, result").eq("profile_id", meId).maybeSingle<{ input_hash: string; result: Matches }>();
   if (cached?.input_hash === hash) return cached.result;
 
-  const ai = key ? await claudeMatches(me, withData, key) : null;
+  const ai = key ? await claudeMatches(me, withData, key) : hasGemini() ? await geminiMatches(me, withData) : null;
   const result = ai ?? keywordMatches(me, withData);
   // A failed AI call isn't cached: next visit tries again.
-  if (!key || ai) await supabase.from("match_cache").upsert({ profile_id: meId, input_hash: hash, result, created_at: new Date().toISOString() });
+  if (!(key || hasGemini()) || ai) await supabase.from("match_cache").upsert({ profile_id: meId, input_hash: hash, result, created_at: new Date().toISOString() });
   return result;
 }

@@ -17,7 +17,7 @@ type Step = "about" | "drafting" | "card" | "in";
 
 const PROMPTS = ["who you are", "what you do", "what you need", "what you can help with"];
 
-export function JoinFlow({ code, uid, inviterName, defaults, guess }: { code: string; uid: string; inviterName: string; defaults: { name: string; handle: string }; guess: City | null }) {
+export function JoinFlow({ code, uid, inviterName, defaults, guess, serverVoice }: { code: string; uid: string; inviterName: string; defaults: { name: string; handle: string }; guess: City | null; serverVoice: boolean }) {
   const [step, setStep] = useState<Step>("about");
   const [transcript, setTranscript] = useState("");
   const [card, setCard] = useState({ name: defaults.name, role: "", handle: defaults.handle, bio_md: "" });
@@ -45,7 +45,7 @@ export function JoinFlow({ code, uid, inviterName, defaults, guess }: { code: st
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col px-5 pt-8 pb-10">
       <Logo size={28} className="text-ink" />
-      {step === "about" && <AboutStep transcript={transcript} setTranscript={setTranscript} onNext={draft} error={error} />}
+      {step === "about" && <AboutStep transcript={transcript} setTranscript={setTranscript} onNext={draft} error={error} serverVoice={serverVoice} />}
       {step === "drafting" && (
         <div className="mt-24 flex flex-col items-center gap-4 text-center">
           <div className="h-24 w-full animate-pulse rounded-[var(--radius-lg)] bg-surface shadow-[var(--shadow-ai)]" />
@@ -83,16 +83,92 @@ function getRecognition(): Recognition | null {
 }
 const noSubscribe = () => () => {};
 
-function AboutStep({ transcript, setTranscript, onNext, error }: { transcript: string; setTranscript: (f: (t: string) => string) => void; onNext: () => void; error: string | null }) {
+function AboutStep({
+  transcript,
+  setTranscript,
+  onNext,
+  error,
+  serverVoice,
+}: {
+  transcript: string;
+  setTranscript: (f: (t: string) => string) => void;
+  onNext: () => void;
+  error: string | null;
+  serverVoice: boolean;
+}) {
   const rec = useRef<Recognition | null>(null);
+  const recorder = useRef<MediaRecorder | null>(null);
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
-  // Voice input where the browser has speech recognition (Chrome, Safari); typing works everywhere.
-  const supported = useSyncExternalStore(noSubscribe, () => recognitionCtor() !== null, () => false);
+  const [busy, setBusy] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  // Voice: recorded and transcribed on the server (Gemini) when it's set up, else the browser's own
+  // speech recognition (Chrome, Safari). Typing works everywhere.
+  const recorderOk = useSyncExternalStore(noSubscribe, () => serverVoice && typeof MediaRecorder !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia), () => false);
+  const browserOk = useSyncExternalStore(noSubscribe, () => recognitionCtor() !== null, () => false);
+  const supported = recorderOk || browserOk;
 
-  useEffect(() => () => rec.current?.stop(), []);
+  useEffect(
+    () => () => {
+      rec.current?.stop();
+      if (recorder.current?.state === "recording") recorder.current.stop();
+    },
+    [],
+  );
+  useEffect(() => {
+    if (!listening || !recorderOk) return;
+    const t = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [listening, recorderOk]);
+  useEffect(() => {
+    if (seconds >= 180 && recorder.current?.state === "recording") recorder.current.stop();
+  }, [seconds]);
+
+  const record = async () => {
+    setVoiceError(null);
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setVoiceError("microphone is off — allow it in the browser, or type below");
+      return;
+    }
+    const type = ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus"].find((t) => MediaRecorder.isTypeSupported(t));
+    const r = new MediaRecorder(stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: 32000 });
+    const chunks: Blob[] = [];
+    r.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    r.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      setListening(false);
+      setSeconds(0);
+      const blob = new Blob(chunks, { type: r.mimeType || type || "audio/webm" });
+      if (blob.size < 2000) return;
+      setBusy(true);
+      try {
+        const body = new FormData();
+        body.append("audio", blob, "intro");
+        const res = await fetch("/api/transcribe", { method: "POST", body });
+        const json = (await res.json()) as { text?: string; error?: string };
+        if (json.text) setTranscript((t) => `${t}${t && !t.endsWith(" ") ? " " : ""}${json.text!.trim()}`);
+        else setVoiceError(json.error ?? "couldn't make out the recording. try again or type it.");
+      } catch {
+        setVoiceError("couldn't send the recording. check the connection and try again.");
+      } finally {
+        setBusy(false);
+      }
+    };
+    recorder.current = r;
+    r.start();
+    setListening(true);
+  };
 
   const toggle = () => {
+    if (recorderOk) {
+      if (listening) recorder.current?.stop();
+      else void record();
+      return;
+    }
     if (listening) {
       rec.current?.stop();
       return;
@@ -140,6 +216,7 @@ function AboutStep({ transcript, setTranscript, onNext, error }: { transcript: s
           <button
             type="button"
             onClick={toggle}
+            disabled={busy}
             aria-pressed={listening}
             aria-label={listening ? "stop recording" : "start recording"}
             className={`grid h-24 w-24 place-items-center rounded-full transition-transform active:scale-95 ${listening ? "bg-ink text-paper" : "bg-fire text-on-fire"}`}
@@ -153,7 +230,16 @@ function AboutStep({ transcript, setTranscript, onNext, error }: { transcript: s
               </svg>
             )}
           </button>
-          <span className="meta">{listening ? "listening… tap to stop" : "tap to record · or type below"}</span>
+          <span className="meta">
+            {busy
+              ? "turning your voice into text…"
+              : listening
+                ? recorderOk
+                  ? `recording ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} · tap to stop`
+                  : "listening… tap to stop"
+                : "tap to record · or type below"}
+          </span>
+          {voiceError && <span className="text-sm text-fire-ink">{voiceError}</span>}
         </div>
       )}
 
@@ -173,7 +259,7 @@ function AboutStep({ transcript, setTranscript, onNext, error }: { transcript: s
         </p>
       )}
       <div className="mt-auto pt-6">
-        <Button className="w-full" disabled={transcript.trim().length < 20 || listening} onClick={onNext}>
+        <Button className="w-full" disabled={transcript.trim().length < 20 || listening || busy} onClick={onNext}>
           make my card
         </Button>
       </div>

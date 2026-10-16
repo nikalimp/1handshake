@@ -1,4 +1,5 @@
 import "server-only";
+import { geminiJson, hasGemini } from "@/lib/gemini";
 
 export type DraftCard = { name: string; role: string; handle: string; bio_md: string };
 
@@ -45,10 +46,34 @@ export function fallbackCard(transcript: string, googleName: string, email: stri
   return { name: googleName, role: "", handle: handleFrom(googleName || email.split("@")[0]), bio_md: transcript.trim() };
 }
 
+const CARD_SCHEMA = {
+  type: "OBJECT",
+  properties: { name: { type: "STRING" }, role: { type: "STRING" }, handle: { type: "STRING" }, bio_md: { type: "STRING" } },
+  required: ["name", "role", "handle", "bio_md"],
+};
+
+const finish = (card: Partial<DraftCard> | null | undefined, googleName: string) =>
+  card?.bio_md
+    ? {
+        name: (card.name || googleName).slice(0, 80),
+        role: (card.role ?? "").slice(0, 80),
+        handle: handleFrom(card.handle || card.name || googleName),
+        bio_md: card.bio_md.slice(0, 4000),
+        ai: true,
+      }
+    : null;
+
+/** Intro → card: Claude when ANTHROPIC_API_KEY is set, else Gemini (GEMINI_API_KEY), else the intro as is. */
 export async function draftCard(transcript: string, googleName: string, email: string): Promise<DraftCard & { ai: boolean }> {
   const key = process.env.ANTHROPIC_API_KEY;
   const fallback = { ...fallbackCard(transcript, googleName, email), ai: false };
-  if (!key || !transcript.trim()) return fallback;
+  if (!transcript.trim()) return fallback;
+  const prompt = `google account name: ${googleName || "unknown"}\n\nintro:\n${transcript.slice(0, 6000)}`;
+  if (!key) {
+    if (!hasGemini()) return fallback;
+    const card = await geminiJson<Partial<DraftCard>>({ system: SYSTEM, prompt, schema: CARD_SCHEMA });
+    return finish(card, googleName) ?? fallback;
+  }
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -59,21 +84,13 @@ export async function draftCard(transcript: string, googleName: string, email: s
         system: SYSTEM,
         tools: [TOOL],
         tool_choice: { type: "tool", name: "save_card" },
-        messages: [{ role: "user", content: `google account name: ${googleName || "unknown"}\n\nintro:\n${transcript.slice(0, 6000)}` }],
+        messages: [{ role: "user", content: prompt }],
       }),
       signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) return fallback;
     const json = (await res.json()) as { content?: { type: string; input?: Partial<DraftCard> }[] };
-    const card = json.content?.find((c) => c.type === "tool_use")?.input;
-    if (!card?.bio_md) return fallback;
-    return {
-      name: (card.name || googleName).slice(0, 80),
-      role: (card.role ?? "").slice(0, 80),
-      handle: handleFrom(card.handle || card.name || googleName),
-      bio_md: card.bio_md.slice(0, 4000),
-      ai: true,
-    };
+    return finish(json.content?.find((c) => c.type === "tool_use")?.input, googleName) ?? fallback;
   } catch {
     return fallback;
   }
