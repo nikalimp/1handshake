@@ -34,6 +34,12 @@ export function Combobox({
   const [active, setActive] = useState(0);
   const [loading, setLoading] = useState(false);
   const ask = useRef(0);
+  // A value picked from outside (e.g. "use my location") shows up in the field.
+  const [shown, setShown] = useState(value?.label);
+  if (value?.label !== shown) {
+    setShown(value?.label);
+    if (value && !clearOnSelect) setText(value.label);
+  }
 
   useEffect(() => {
     if (!open) return;

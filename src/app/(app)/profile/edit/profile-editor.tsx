@@ -6,9 +6,12 @@ import { Avatar } from "@/components/avatar";
 import { Button, buttonClass } from "@/components/button";
 import { type City, CityPicker } from "@/components/city-picker";
 import { Combobox, type Option } from "@/components/combobox";
+import { ListField } from "@/components/list-field";
 import { MarkdownField } from "@/components/markdown-field";
 import { SITE_HOST } from "@/lib/env";
 import { fileToSquareJpeg } from "@/lib/image";
+import { LINK_KINDS, type LinkKey } from "@/lib/links";
+import { MAX_NEEDS } from "@/lib/needs";
 import { createClient } from "@/lib/supabase/client";
 import { saveProfile } from "./actions";
 
@@ -25,6 +28,9 @@ type Me = {
   open_to_hiring: boolean;
   open_to_network: boolean;
   spheres: number[];
+  links: Partial<Record<LinkKey, string>>;
+  needs: string[];
+  cans: string[];
 };
 type Sphere = { id: number; parent_id: number | null; name: string };
 
@@ -105,6 +111,9 @@ export function ProfileEditor({ me, spheres }: { me: Me; spheres: Sphere[] }) {
         open_to_hiring: form.open_to_hiring,
         open_to_network: form.open_to_network,
         spheres: form.spheres,
+        links: form.links,
+        needs: form.needs,
+        cans: form.cans,
       });
       if ("error" in res) setError(res.error);
       else {
@@ -164,6 +173,34 @@ export function ProfileEditor({ me, spheres }: { me: Me; spheres: Sphere[] }) {
           {form.handle !== me.handle && <span className="text-xs text-fire-ink">links to {SITE_HOST}/@{me.handle} will stop working. your connections stay.</span>}
         </label>
         <MarkdownField value={form.bio_md} onChange={(v) => set("bio_md", v)} />
+      </section>
+
+      <section className="flex flex-col gap-5 rounded-[var(--radius-lg)] bg-surface p-5 shadow-[var(--shadow-card)]" aria-label="i need and i can">
+        <p className="text-sm text-ink-muted">members see these and connect finds you matches. on your public card they stay blurred.</p>
+        <ListField label="i need" items={form.needs} onChange={(v) => set("needs", v)} max={MAX_NEEDS} placeholder="e.g. a cto for a fintech startup" />
+        <ListField label="i can" items={form.cans} onChange={(v) => set("cans", v)} max={MAX_NEEDS} placeholder="e.g. review your pitch deck" />
+      </section>
+
+      <section className="flex flex-col gap-3 rounded-[var(--radius-lg)] bg-surface p-5 shadow-[var(--shadow-card)]" aria-label="links">
+        <div>
+          <p className="font-semibold">links</p>
+          <p className="text-sm text-ink-muted">there&apos;s no chat in the club yet — this is how members reach you</p>
+        </div>
+        {LINK_KINDS.map((k) => (
+          <label key={k.key} className="flex items-center gap-3">
+            <span className="meta w-20 shrink-0">{k.label}</span>
+            <input
+              value={form.links[k.key] ?? ""}
+              onChange={(e) => set("links", { ...form.links, [k.key]: e.target.value })}
+              placeholder={k.placeholder}
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              inputMode="url"
+              className={`${field} py-2.5`}
+            />
+          </label>
+        ))}
       </section>
 
       <section className="flex flex-col gap-4 rounded-[var(--radius-lg)] bg-surface p-5 shadow-[var(--shadow-card)]">

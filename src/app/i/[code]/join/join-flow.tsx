@@ -17,7 +17,7 @@ type Step = "about" | "drafting" | "card" | "in";
 
 const PROMPTS = ["who you are", "what you do", "what you need", "what you can help with"];
 
-export function JoinFlow({ code, uid, inviterName, defaults }: { code: string; uid: string; inviterName: string; defaults: { name: string; handle: string } }) {
+export function JoinFlow({ code, uid, inviterName, defaults, guess }: { code: string; uid: string; inviterName: string; defaults: { name: string; handle: string }; guess: City | null }) {
   const [step, setStep] = useState<Step>("about");
   const [transcript, setTranscript] = useState("");
   const [card, setCard] = useState({ name: defaults.name, role: "", handle: defaults.handle, bio_md: "" });
@@ -53,7 +53,7 @@ export function JoinFlow({ code, uid, inviterName, defaults }: { code: string; u
         </div>
       )}
       {step === "card" && (
-        <CardStep code={code} uid={uid} card={card} setCard={setCard} ai={ai} onBack={() => setStep("about")} onJoined={() => setStep("in")} />
+        <CardStep code={code} uid={uid} card={card} setCard={setCard} ai={ai} guess={guess} onBack={() => setStep("about")} onJoined={() => setStep("in")} />
       )}
       {step === "in" && <YoureIn inviterName={inviterName} />}
     </main>
@@ -191,6 +191,7 @@ function CardStep({
   card,
   setCard,
   ai,
+  guess,
   onBack,
   onJoined,
 }: {
@@ -199,6 +200,7 @@ function CardStep({
   card: CardFields;
   setCard: (f: (c: CardFields) => CardFields) => void;
   ai: boolean;
+  guess: City | null;
   onBack: () => void;
   onJoined: () => void;
 }) {
@@ -206,7 +208,7 @@ function CardStep({
   const file = useRef<HTMLInputElement>(null);
   const [avatar, setAvatar] = useState<{ path: string; url: string } | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [city, setCity] = useState<City | null>(null);
+  const [city, setCity] = useState<City | null>(guess);
   const [birth, setBirth] = useState("");
   const [agree, setAgree] = useState(false);
   const [today] = useState(() => new Date().toISOString().slice(0, 10));
@@ -322,7 +324,7 @@ function CardStep({
         </label>
         <div className="flex flex-col gap-1.5">
           <span className="meta">city</span>
-          <CityPicker value={city} onChange={setCity} className={`${field} ${ring("city")}`} />
+          <CityPicker value={city} onChange={setCity} className={`${field} ${ring("city")}`} note={guess && city?.id === guess.id ? "guessed from your connection" : null} />
         </div>
         <label className="flex flex-col gap-1.5">
           <span className="meta">birthday · only you see it</span>

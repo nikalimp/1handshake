@@ -4,6 +4,7 @@ import { Avatar } from "@/components/avatar";
 import { buttonClass } from "@/components/button";
 import { BackButton, RequestActions } from "@/components/feed-controls";
 import { ReportHandshake } from "@/components/moderation";
+import { PushCard } from "@/components/push-card";
 import { ScreenTitle } from "@/components/screen-title";
 import { FireButton } from "@/components/wall-controls";
 import type { Card } from "@/lib/data";
@@ -74,6 +75,7 @@ export function FeedView({ me, incoming, toBack, events, people, avatars, selfie
     <>
       <ScreenTitle title="feed" />
       <div className="flex flex-col gap-8">
+        <PushCard />
         {incoming.length > 0 && (
           <Section title="want to meet you">
             {incoming.map((r) => {

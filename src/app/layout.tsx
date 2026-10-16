@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { THEME_SCRIPT } from "@/lib/theme";
 import { SITE_URL } from "@/lib/env";
 
 // Fonts are self-hosted (OFL): no requests to Google from members' browsers.
@@ -23,6 +24,7 @@ export const metadata: Metadata = {
   title: { default: "1handshake", template: "%s · 1handshake" },
   description: "A members-only club for people in tech. Everyone you need is one handshake away.",
   icons: { icon: "/1h-app-icon.svg" },
+  appleWebApp: { capable: true, title: "1handshake", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
@@ -35,7 +37,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${figtree.variable} ${geistMono.variable} h-full`}>
+    <html lang="en" className={`${figtree.variable} ${geistMono.variable} h-full`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-full">{children}</body>
     </html>
   );

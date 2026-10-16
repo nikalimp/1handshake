@@ -28,13 +28,16 @@ export async function loadProfile(handle: string, me: Card) {
 
   const isMe = person.id === me.id;
   const [a, b] = [me.id, person.id].sort();
-  const [{ data: link }, { data: wallRows }, { data: sphereRows }] = await Promise.all([
+  const [{ data: link }, { data: wallRows }, { data: sphereRows }, { data: needRows }] = await Promise.all([
     isMe
       ? Promise.resolve({ data: null })
       : supabase.from("connections").select("kind").eq("user_a", a).eq("user_b", b).maybeSingle<{ kind: "met" | "intro" }>(),
     supabase.rpc("wall", { p_profile: person.id }),
     supabase.from("profile_spheres").select("is_primary, spheres(name)").eq("profile_id", person.id).returns<{ is_primary: boolean; spheres: { name: string } | null }[]>(),
+    supabase.from("needs_offers").select("kind, body").eq("profile_id", person.id).order("created_at").returns<{ kind: "need" | "can"; body: string }[]>(),
   ]);
+  const needs = (needRows ?? []).filter((n) => n.kind === "need").map((n) => n.body);
+  const cans = (needRows ?? []).filter((n) => n.kind === "can").map((n) => n.body);
   const spheres = (sphereRows ?? [])
     .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
     .map((s) => s.spheres?.name)
@@ -50,7 +53,7 @@ export async function loadProfile(handle: string, me: Card) {
     signedUrls(supabase, "selfies", wall.map((w) => w.selfie_path)),
   ]);
 
-  return { person, isMe, connection: link?.kind ?? null, wall, people, avatars, selfies, spheres };
+  return { person, isMe, connection: link?.kind ?? null, wall, people, avatars, selfies, spheres, needs, cans };
 }
 
 export type LoadedProfile = NonNullable<Awaited<ReturnType<typeof loadProfile>>>;

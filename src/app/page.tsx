@@ -5,7 +5,7 @@ import { getMe } from "@/lib/data";
 import { isSupabaseConfigured } from "@/lib/env";
 
 export default async function Landing(props: PageProps<"/">) {
-  const { error } = await props.searchParams;
+  const { error, bye } = await props.searchParams;
   if (isSupabaseConfigured && (await getMe())) redirect("/connect");
 
   return (
@@ -16,6 +16,7 @@ export default async function Landing(props: PageProps<"/">) {
         <p className="text-ink-muted">
           a members-only club for people in tech. you get in only by meeting a member — in person, with a selfie to prove it.
         </p>
+        {bye && <p className="rounded-[var(--radius-md)] bg-surface-sunk px-4 py-3 text-sm">👻 your account is deleted. thanks for being part of the club.</p>}
         {(error === "members-only" || error === "sign-in-failed") && (
           <p role="alert" className="rounded-[var(--radius-md)] bg-fire-soft px-4 py-3 text-sm text-fire-ink">
             {error === "members-only" ? "this google account isn't a member yet. ask a member for a handshake." : "google sign-in didn't go through. try again."}

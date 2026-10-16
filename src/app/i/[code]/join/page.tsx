@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { guessCity } from "@/lib/geo";
 import { InviteProblem } from "@/components/invite-problem";
 import { handleFrom } from "@/lib/ai-card";
 import { getMe } from "@/lib/data";
@@ -22,6 +23,7 @@ export default async function Join(props: PageProps<"/i/[code]/join">) {
   const problem = inviteProblem(inv);
   if (!inv || problem) return <InviteProblem title={problem ?? "this code doesn't exist"} />;
 
+  const guess = await guessCity(supabase);
   const meta = user.user_metadata as { full_name?: string; name?: string };
   const googleName = meta.full_name ?? meta.name ?? "";
 
@@ -30,6 +32,7 @@ export default async function Join(props: PageProps<"/i/[code]/join">) {
       code={code}
       uid={user.id}
       inviterName={inv.inviter_name ?? "your inviter"}
+      guess={guess}
       defaults={{ name: googleName, handle: handleFrom(googleName || (user.email ?? "").split("@")[0]) }}
     />
   );

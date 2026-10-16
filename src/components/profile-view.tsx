@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { Avatar } from "@/components/avatar";
 import { Markdown } from "@/components/markdown";
 import { ReportHandshake } from "@/components/moderation";
+import { NeedsTabs } from "@/components/needs-tabs";
+import { SocialLinks } from "@/components/social-links";
 import { FireButton, RemovePost, WallComposer } from "@/components/wall-controls";
 import type { Card } from "@/lib/data";
 import type { LoadedProfile } from "@/lib/profile";
@@ -22,7 +24,7 @@ function PersonLink({ person, children }: { person?: Card | null; children: Reac
 
 /** Internal profile: the visit card for members, plus the wall. Used for my profile and for others. */
 export function ProfileView({ data, me, actions }: { data: LoadedProfile; me: Card; actions?: ReactNode }) {
-  const { person, isMe, connection, wall, people, avatars, selfies, spheres } = data;
+  const { person, isMe, connection, wall, people, avatars, selfies, spheres, needs, cans } = data;
   const canWrite = isMe || connection !== null;
 
   return (
@@ -52,6 +54,8 @@ export function ProfileView({ data, me, actions }: { data: LoadedProfile; me: Ca
           </ul>
         )}
         {person.bio_md && <Markdown source={person.bio_md} />}
+        <NeedsTabs needs={needs} cans={cans} isMe={isMe} firstName={firstName(person)} />
+        <SocialLinks links={person.links} />
       </article>
 
       <section className="flex flex-col gap-4" aria-label="wall">

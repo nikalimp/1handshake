@@ -16,8 +16,9 @@
    - `supabase/migrations/20261016000400_connect_feed.sql` — лента, запросы на знакомство и огоньки поддержки;
    - `supabase/migrations/20261016000500_city_names.sql` — названия городов с заглавной;
    - `supabase/migrations/20261016000600_moderation_places.sql` — жалобы на фейковые 🤝, админы, удаление коннекта, цифровые профессии;
+   - `supabase/migrations/20261016000700_links_needs_push_ghost.sql` — координаты городов, соцсети, I need / I can, уведомления, удаление аккаунта и экспорт;
    - `supabase/seed.sql` — сферы и города;
-   - `supabase/seed_cities.sql` — города мира от 50 000 жителей (≈9 000, GeoNames, CC BY 4.0).
+   - `supabase/seed_cities.sql` — города мира от 50 000 жителей с координатами (≈9 000, GeoNames, CC BY 4.0).
 4. Project Settings → API: скопируй **Project URL**, **publishable key**, **service_role key** (секретный).
 
 ## 2. Вход через Google

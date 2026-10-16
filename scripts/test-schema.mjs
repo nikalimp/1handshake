@@ -10,7 +10,7 @@ const db = new PGlite({ extensions: { vector } });
 const sql = (q, p) => db.query(q, p);
 
 await db.exec(`
-  create role anon nologin; create role authenticated nologin;
+  create role anon nologin; create role authenticated nologin; create role service_role nologin;
   create schema auth;
   create table auth.users (id uuid primary key);
   create function auth.uid() returns uuid language sql stable as
@@ -24,6 +24,7 @@ await db.exec(readFileSync("supabase/migrations/20261016000300_profile_wall.sql"
 await db.exec(readFileSync("supabase/migrations/20261016000400_connect_feed.sql", "utf8"));
 await db.exec(readFileSync("supabase/migrations/20261016000500_city_names.sql", "utf8"));
 await db.exec(readFileSync("supabase/migrations/20261016000600_moderation_places.sql", "utf8"));
+await db.exec(readFileSync("supabase/migrations/20261016000700_links_needs_push_ghost.sql", "utf8"));
 await db.exec(readFileSync("supabase/seed.sql", "utf8"));
 await db.exec(readFileSync("supabase/seed_cities.sql", "utf8"));
 // No broad grants here: the migration's own grants must be enough ("auto-expose tables" off).
@@ -242,5 +243,38 @@ await as("david");
 await sql(`select remove_connection($1)`, [ids.nik]);
 assert.equal((await sql(`select is_connected($1,$2) c`, [ids.nik, ids.david])).rows[0].c, false);
 console.log("✓ fake handshake: 3 reports hide the selfie → admin cancels; either person can remove a connection");
+
+// 11. City from location, links, needs on the public card, push devices, export, ghost
+await as(null, "anon");
+assert.equal((await sql(`select name from nearest_city(41.70, 44.80)`)).rows[0].name, "Tbilisi");
+assert.equal((await sql(`select name from nearest_city(55.90, 37.45)`)).rows[0].name, "Moscow", "a suburb counts as the big city");
+assert.equal((await sql(`select count(*)::int c from nearest_city(0, -140)`)).rows[0].c, 0, "the middle of the ocean is no city");
+await as("nik");
+await sql(`update profiles set links = '{"telegram": "https://t.me/nik"}' where id = $1`, [ids.nik]);
+await sql(`insert into needs_offers (profile_id, kind, body) values ($1, 'need', 'a backend engineer'), ($1, 'can', 'brand design')`, [ids.nik]);
+await as(null, "anon");
+assert.equal((await sql(`select links->>'telegram' t from profiles where id = $1`, [ids.nik])).rows[0].t, "https://t.me/nik");
+assert.deepEqual((await sql(`select needs, cans from needs_count($1)`, [ids.nik])).rows[0], { needs: 1, cans: 1 });
+await assert.rejects(sql(`select * from needs_offers`), /permission denied/, "needs stay members-only");
+await as("nik");
+await sql(`select save_push_subscription('https://push.example/abc', 'key', 'auth')`);
+await as("ivan");
+assert.equal((await sql(`select count(*)::int c from push_subscriptions`)).rows[0].c, 0, "nobody reads other people's devices");
+await sql(`select save_push_subscription('https://push.example/abc', 'key2', 'auth2')`); // ivan signs in on the same phone
+await asAdmin();
+assert.equal((await sql(`select profile_id from push_subscriptions`)).rows[0].profile_id, ids.ivan);
+await as("nik");
+const exp = (await sql(`select my_export() e`)).rows[0].e;
+assert.equal(exp.profile.handle, "nik");
+assert.ok(exp.connections.length > 0 && exp.needs_and_offers.length === 2);
+await as("ivan");
+const before = (await sql(`select count(*)::int c from connections where $1 in (user_a, user_b)`, [ids.ivan])).rows[0].c;
+await sql(`select become_ghost()`);
+await asAdmin();
+const ghost2 = (await sql(`select name, handle, links, status from profiles where id = $1`, [ids.ivan])).rows[0];
+assert.deepEqual(ghost2, { name: null, handle: null, links: {}, status: "ghost" });
+assert.equal((await sql(`select count(*)::int c from push_subscriptions`)).rows[0].c, 0);
+assert.equal((await sql(`select count(*)::int c from connections where $1 in (user_a, user_b)`, [ids.ivan])).rows[0].c, before, "the ghost keeps its place in the graph");
+console.log("✓ nearest city, links, needs count, push devices, export, ghost");
 
 console.log("\nall schema checks passed");

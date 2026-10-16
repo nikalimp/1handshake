@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import type { Links } from "@/lib/links";
 import { createClient } from "@/lib/supabase/server";
 
 export type Card = {
@@ -14,8 +15,9 @@ export type Card = {
   open_to_hiring: boolean;
   open_to_network: boolean;
   status: "active" | "ghost" | "banned";
+  links: Links | null;
 };
-export const CARD_FIELDS = "id, handle, name, role, bio_md, avatar_path, city_id, open_to_hiring, open_to_network, status";
+export const CARD_FIELDS = "id, handle, name, role, bio_md, avatar_path, city_id, open_to_hiring, open_to_network, status, links";
 
 /** Current member, or null when signed out / signed in without a profile (not invited). */
 export const getMe = cache(async () => {

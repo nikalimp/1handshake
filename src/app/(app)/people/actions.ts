@@ -1,6 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getMe } from "@/lib/data";
+import { firstName, sendPush } from "@/lib/push";
 import { createClient } from "@/lib/supabase/server";
 
 // Wall actions. The database decides who may do what (RLS): you write on your own wall or a
@@ -15,6 +17,9 @@ export async function postToWall(ownerId: string, body: string): Promise<{ ok: t
   const supabase = await createClient();
   const { error } = await supabase.from("wall_posts").insert({ wall_owner_id: ownerId, author_id: me.id, body: text });
   if (error) return { error: error.message.includes("row-level security") ? "only connections can write here" : "couldn't post. try again." };
+  if (ownerId !== me.id) {
+    after(() => sendPush([ownerId], { title: `${firstName(me.name)} wrote on your wall`, body: text.slice(0, 120), url: "/profile", tag: `wall-${me.id}` }));
+  }
   revalidatePath("/profile");
   revalidatePath("/people/[handle]", "page");
   return { ok: true };

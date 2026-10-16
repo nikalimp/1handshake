@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { SITE_URL } from "@/lib/env";
+import { cleanLinks, LINK_KINDS } from "@/lib/links";
 import { createClient } from "@/lib/supabase/server";
 import { CARD_FIELDS, type Card } from "@/lib/data";
 
@@ -20,6 +21,9 @@ export function cardToMarkdown(card: Card & { cities?: { name: string } | null }
   const lines = [`# ${card.name ?? "member"} — ${card.role ?? "member of 1handshake"}`, ""];
   if (card.cities?.name) lines.push(`city: ${card.cities.name}`, "");
   if (card.bio_md) lines.push(card.bio_md.trim(), "");
+  const links = cleanLinks(card.links);
+  const linkLines = LINK_KINDS.filter((k) => links[k.key]).map((k) => `- ${k.label}: ${links[k.key]}`);
+  if (linkLines.length) lines.push("## links", ...linkLines, "");
   lines.push(`card: ${SITE_URL}/@${card.handle}`);
   return lines.join("\n");
 }
