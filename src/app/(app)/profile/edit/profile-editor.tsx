@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/avatar";
 import { Button, buttonClass } from "@/components/button";
-import { Markdown } from "@/components/markdown";
+import { MarkdownField } from "@/components/markdown-field";
+import { SITE_HOST } from "@/lib/env";
 import { fileToSquareJpeg } from "@/lib/image";
 import { createClient } from "@/lib/supabase/client";
 import { saveProfile } from "./actions";
@@ -21,7 +22,9 @@ type Me = {
   avatar_url: string | null;
   open_to_hiring: boolean;
   open_to_network: boolean;
+  spheres: number[];
 };
+type Sphere = { id: number; parent_id: number | null; name: string };
 
 const field = "w-full rounded-[var(--radius-md)] border border-line bg-surface px-4 py-3 outline-none focus:border-line-strong";
 
@@ -43,12 +46,11 @@ function Toggle({ on, onChange, disabled, label, hint }: { on: boolean; onChange
   );
 }
 
-export function ProfileEditor({ me, cities }: { me: Me; cities: { id: number; name: string }[] }) {
+export function ProfileEditor({ me, cities, spheres }: { me: Me; cities: { id: number; name: string }[]; spheres: Sphere[] }) {
   const router = useRouter();
   const [supabase] = useState(createClient);
   const file = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState(me);
-  const [view, setView] = useState<"markdown" | "preview">("markdown");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -85,6 +87,7 @@ export function ProfileEditor({ me, cities }: { me: Me; cities: { id: number; na
         avatar_path: form.avatar_path,
         open_to_hiring: form.open_to_hiring,
         open_to_network: form.open_to_network,
+        spheres: form.spheres,
       });
       if ("error" in res) setError(res.error);
       else {
@@ -136,32 +139,14 @@ export function ProfileEditor({ me, cities }: { me: Me; cities: { id: number; na
           <input value={form.role} onChange={(e) => set("role", e.target.value)} maxLength={80} placeholder="e.g. founder, ai notes app" className={field} />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="meta">handle · 1handshake.com/@{form.handle || "you"}</span>
+          <span className="meta">handle · {SITE_HOST}/@{form.handle || "you"}</span>
           <div className="flex items-center rounded-[var(--radius-md)] border border-line bg-surface pl-4 focus-within:border-line-strong">
             <span className="text-ink-muted">@</span>
             <input value={form.handle} onChange={(e) => set("handle", e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))} maxLength={30} className="w-full bg-transparent px-1 py-3 outline-none" />
           </div>
-          {form.handle !== me.handle && <span className="text-xs text-fire-ink">links to 1handshake.com/@{me.handle} will stop working.</span>}
+          {form.handle !== me.handle && <span className="text-xs text-fire-ink">links to {SITE_HOST}/@{me.handle} will stop working. your connections stay.</span>}
         </label>
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <span className="meta">about · markdown</span>
-            <div className="flex gap-1 rounded-full bg-surface-sunk p-1 text-sm font-semibold" role="tablist">
-              {(["markdown", "preview"] as const).map((v) => (
-                <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => setView(v)} className={`rounded-full px-3 py-0.5 ${view === v ? "bg-surface shadow-sm" : "text-ink-muted"}`}>
-                  {v}
-                </button>
-              ))}
-            </div>
-          </div>
-          {view === "markdown" ? (
-            <textarea value={form.bio_md} onChange={(e) => set("bio_md", e.target.value)} rows={9} maxLength={4000} className={`${field} font-mono text-[13px] leading-5`} />
-          ) : (
-            <div className="min-h-24 rounded-[var(--radius-md)] border border-dashed border-line-strong px-4 py-3">
-              {form.bio_md.trim() ? <Markdown source={form.bio_md} /> : <p className="text-ink-muted">nothing here yet</p>}
-            </div>
-          )}
-        </div>
+        <MarkdownField value={form.bio_md} onChange={(v) => set("bio_md", v)} />
       </section>
 
       <section className="flex flex-col gap-4 rounded-[var(--radius-lg)] bg-surface p-5 shadow-[var(--shadow-card)]">
@@ -180,6 +165,41 @@ export function ProfileEditor({ me, cities }: { me: Me; cities: { id: number; na
           <span className="meta">birthday · only you see it</span>
           <input type="date" value={form.birth_date} onChange={(e) => set("birth_date", e.target.value)} max={today} className={field} />
         </label>
+      </section>
+
+      <section className="flex flex-col gap-3 rounded-[var(--radius-lg)] bg-surface p-5 shadow-[var(--shadow-card)]" aria-label="spheres">
+        <div>
+          <p className="font-semibold">what you work in</p>
+          <p className="text-sm text-ink-muted">up to 3 · the first one is your main sphere · members filter the graph by it</p>
+        </div>
+        {spheres
+          .filter((p) => p.parent_id === null)
+          .map((p) => (
+            <div key={p.id} className="flex flex-col gap-1.5">
+              <span className="meta">{p.name}</span>
+              <div className="flex flex-wrap gap-1.5">
+                {spheres
+                  .filter((s) => s.parent_id === p.id)
+                  .map((s) => {
+                    const at = form.spheres.indexOf(s.id);
+                    const on = at !== -1;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        aria-pressed={on}
+                        disabled={!on && form.spheres.length >= 3}
+                        onClick={() => set("spheres", on ? form.spheres.filter((x) => x !== s.id) : [...form.spheres, s.id])}
+                        className={`rounded-full px-3 py-1.5 text-sm transition-colors disabled:opacity-40 ${on ? "bg-fire font-semibold text-on-fire" : "bg-surface-sunk"}`}
+                      >
+                        {at === 0 && "★ "}
+                        {s.name}
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          ))}
       </section>
 
       <section className="flex flex-col divide-y divide-line rounded-[var(--radius-lg)] bg-surface px-5 py-2 shadow-[var(--shadow-card)]">

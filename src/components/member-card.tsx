@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { ConnectCard } from "@/components/connect-card";
+import { plainText } from "@/components/markdown";
 import type { Card } from "@/lib/data";
 
 const first = (c: Card) => (c.name ?? "a member").split(" ")[0];
@@ -20,7 +21,7 @@ export function MemberCard({ person, mutuals, avatars }: { person: Card; mutuals
           {person.handle && <p className="meta mt-1.5">@{person.handle} · 2nd</p>}
         </div>
       </div>
-      {person.bio_md && <p className="line-clamp-3 whitespace-pre-line">{person.bio_md}</p>}
+      {person.bio_md && <p className="line-clamp-3 whitespace-pre-line">{plainText(person.bio_md)}</p>}
       <div className="flex items-center gap-2 border-t border-line pt-4">
         <span className="flex">
           {mutuals.slice(0, 3).map((m, i) => (

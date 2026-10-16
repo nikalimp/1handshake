@@ -21,7 +21,7 @@ function PersonLink({ person, children }: { person?: Card | null; children: Reac
 
 /** Internal profile: the visit card for members, plus the wall. Used for my profile and for others. */
 export function ProfileView({ data, me, actions }: { data: LoadedProfile; me: Card; actions?: ReactNode }) {
-  const { person, isMe, connection, wall, people, avatars, selfies } = data;
+  const { person, isMe, connection, wall, people, avatars, selfies, spheres } = data;
   const canWrite = isMe || connection !== null;
 
   return (
@@ -41,6 +41,15 @@ export function ProfileView({ data, me, actions }: { data: LoadedProfile; me: Ca
             {connection === "intro" && " · 🔗 connected"}
           </p>
         </div>
+        {spheres.length > 0 && (
+          <ul className="flex flex-wrap gap-1.5" aria-label="spheres">
+            {spheres.map((s, i) => (
+              <li key={s} className={`rounded-full px-3 py-1 text-sm ${i === 0 ? "bg-fire-soft font-semibold text-fire-ink" : "bg-surface-sunk"}`}>
+                {s}
+              </li>
+            ))}
+          </ul>
+        )}
         {person.bio_md && <Markdown source={person.bio_md} />}
       </article>
 

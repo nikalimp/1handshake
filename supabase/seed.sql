@@ -2,26 +2,26 @@
 -- Runs on `supabase db reset` and once in production via `psql < supabase/seed.sql`.
 
 insert into public.cities (name, country) values
-  ('tbilisi', 'Georgia'),
-  ('batumi', 'Georgia'),
-  ('bangkok', 'Thailand'),
-  ('phuket', 'Thailand'),
-  ('bali', 'Indonesia'),
-  ('dubai', 'UAE'),
-  ('istanbul', 'Türkiye'),
-  ('yerevan', 'Armenia'),
-  ('almaty', 'Kazakhstan'),
-  ('astana', 'Kazakhstan'),
-  ('belgrade', 'Serbia'),
-  ('lisbon', 'Portugal'),
-  ('barcelona', 'Spain'),
-  ('berlin', 'Germany'),
-  ('london', 'UK'),
-  ('limassol', 'Cyprus'),
-  ('singapore', 'Singapore'),
-  ('hong kong', 'China'),
-  ('new york', 'USA'),
-  ('san francisco', 'USA')
+  ('Tbilisi', 'Georgia'),
+  ('Batumi', 'Georgia'),
+  ('Bangkok', 'Thailand'),
+  ('Phuket', 'Thailand'),
+  ('Bali', 'Indonesia'),
+  ('Dubai', 'UAE'),
+  ('Istanbul', 'Türkiye'),
+  ('Yerevan', 'Armenia'),
+  ('Almaty', 'Kazakhstan'),
+  ('Astana', 'Kazakhstan'),
+  ('Belgrade', 'Serbia'),
+  ('Lisbon', 'Portugal'),
+  ('Barcelona', 'Spain'),
+  ('Berlin', 'Germany'),
+  ('London', 'UK'),
+  ('Limassol', 'Cyprus'),
+  ('Singapore', 'Singapore'),
+  ('Hong Kong', 'China'),
+  ('New York', 'USA'),
+  ('San Francisco', 'USA')
 on conflict (name) do nothing;
 
 insert into public.spheres (parent_id, name) values (null, 'Engineering') on conflict do nothing;

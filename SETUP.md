@@ -14,6 +14,7 @@
    - `supabase/migrations/20261016000200_invite_flow.sql` — отмена инвайта и мгновенный 🤝, когда QR сканирует участник;
    - `supabase/migrations/20261016000300_profile_wall.sql` — время согласия с условиями и стена профиля;
    - `supabase/migrations/20261016000400_connect_feed.sql` — лента, запросы на знакомство и огоньки поддержки;
+   - `supabase/migrations/20261016000500_city_names.sql` — названия городов с заглавной;
    - `supabase/seed.sql` — сферы и города.
 4. Project Settings → API: скопируй **Project URL**, **publishable key**, **service_role key** (секретный).
 
@@ -36,7 +37,7 @@ npm run dev
 Первый участник (ты) появляется без инвайта: войди через Google, затем в Supabase → SQL Editor:
 ```sql
 insert into public.profiles (id, handle, name, role, city_id)
-select id, 'nik', 'nik alimpiev', 'brand & product designer', (select id from cities where name = 'tbilisi')
+select id, 'nik', 'nik alimpiev', 'brand & product designer', (select id from cities where name = 'Tbilisi')
 from auth.users where email = 'твой@gmail.com';
 ```
 Дальше все попадают только через инвайт.

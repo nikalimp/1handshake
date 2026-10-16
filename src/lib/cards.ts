@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { SITE_URL } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 import { CARD_FIELDS, type Card } from "@/lib/data";
 
@@ -19,6 +20,6 @@ export function cardToMarkdown(card: Card & { cities?: { name: string } | null }
   const lines = [`# ${card.name ?? "member"} — ${card.role ?? "member of 1handshake"}`, ""];
   if (card.cities?.name) lines.push(`city: ${card.cities.name}`, "");
   if (card.bio_md) lines.push(card.bio_md.trim(), "");
-  lines.push(`card: https://1handshake.com/@${card.handle}`);
+  lines.push(`card: ${SITE_URL}/@${card.handle}`);
   return lines.join("\n");
 }

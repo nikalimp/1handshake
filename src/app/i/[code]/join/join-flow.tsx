@@ -6,7 +6,8 @@ import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
 import { Confetti } from "@/components/confetti";
 import { Logo } from "@/components/logo";
-import { Markdown } from "@/components/markdown";
+import { MarkdownField } from "@/components/markdown-field";
+import { SITE_HOST } from "@/lib/env";
 import { fileToSquareJpeg } from "@/lib/image";
 import { createClient } from "@/lib/supabase/client";
 import { joinClub, makeCard, markStep } from "./actions";
@@ -207,7 +208,6 @@ function CardStep({
   const file = useRef<HTMLInputElement>(null);
   const [avatar, setAvatar] = useState<{ path: string; url: string } | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [view, setView] = useState<"preview" | "markdown">("preview");
   const [cityId, setCityId] = useState<number | "">("");
   const [birth, setBirth] = useState("");
   const [agree, setAgree] = useState(false);
@@ -311,25 +311,12 @@ function CardStep({
           />
         </label>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex gap-1 self-start rounded-full bg-surface-sunk p-1 text-sm font-semibold" role="tablist">
-            {(["preview", "markdown"] as const).map((v) => (
-              <button key={v} type="button" role="tab" aria-selected={view === v} onClick={() => setView(v)} className={`rounded-full px-3 py-1 ${view === v ? "bg-surface shadow-sm" : "text-ink-muted"}`}>
-                {v}
-              </button>
-            ))}
-          </div>
-          {view === "preview" ? (
-            card.bio_md.trim() ? <Markdown source={card.bio_md} /> : <p className="text-ink-muted">nothing here yet — switch to markdown and write a few lines.</p>
-          ) : (
-            <textarea value={card.bio_md} onChange={set("bio_md")} rows={9} maxLength={4000} className={`${field} font-mono text-[13px] leading-5`} />
-          )}
-        </div>
+        <MarkdownField value={card.bio_md} onChange={(v) => setCard((c) => ({ ...c, bio_md: v }))} defaultView="preview" />
       </article>
 
       <div className="mt-5 flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
-          <span className="meta">handle · 1handshake.com/@{card.handle || "you"}</span>
+          <span className="meta">handle · {SITE_HOST}/@{card.handle || "you"}</span>
           <div className={`flex items-center rounded-[var(--radius-md)] border border-line bg-surface pl-4 focus-within:border-line-strong ${ring("handle")}`}>
             <span className="text-ink-muted">@</span>
             <input value={card.handle} onChange={(e) => setCard((c) => ({ ...c, handle: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "") }))} maxLength={30} className="w-full bg-transparent px-1 py-3 outline-none" />

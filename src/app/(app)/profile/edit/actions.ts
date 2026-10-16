@@ -13,6 +13,7 @@ export type ProfileInput = {
   avatar_path: string | null;
   open_to_hiring: boolean;
   open_to_network: boolean;
+  spheres: number[]; // up to 3, the first one is primary
 };
 
 /** Saves my card. Only the columns a member may change are granted in the database. */
@@ -48,6 +49,13 @@ export async function saveProfile(input: ProfileInput): Promise<{ ok: true } | {
     return { error: "couldn't save. try again." };
   }
 
+  // Spheres: replace the set; the first one is primary.
+  const picked = [...new Set(input.spheres)].slice(0, 3);
+  await supabase.from("profile_spheres").delete().eq("profile_id", me.id);
+  if (picked.length) {
+    await supabase.from("profile_spheres").insert(picked.map((sphere_id, i) => ({ profile_id: me.id, sphere_id, is_primary: i === 0 })));
+  }
+
   // Keep only the current photo in my avatars folder.
   const { data: files } = await supabase.storage.from("avatars").list(me.id, { limit: 100 });
   const stale = (files ?? []).map((f) => `${me.id}/${f.name}`).filter((p) => p !== input.avatar_path);
@@ -55,5 +63,6 @@ export async function saveProfile(input: ProfileInput): Promise<{ ok: true } | {
 
   revalidatePath("/profile");
   revalidatePath("/connect");
+  revalidatePath("/graph");
   return { ok: true };
 }

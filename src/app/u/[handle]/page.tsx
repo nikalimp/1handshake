@@ -4,8 +4,9 @@ import { notFound } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { buttonClass } from "@/components/button";
 import { Logo } from "@/components/logo";
-import { Markdown } from "@/components/markdown";
+import { Markdown, plainText } from "@/components/markdown";
 import { cardToMarkdown, getCardByHandle } from "@/lib/cards";
+import { SITE_HOST } from "@/lib/env";
 import { signedUrls } from "@/lib/files";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -16,9 +17,9 @@ export async function generateMetadata(props: PageProps<"/u/[handle]">): Promise
   const title = `${card.name} — ${card.role}`;
   return {
     title,
-    description: card.bio_md.slice(0, 160),
+    description: plainText(card.bio_md).slice(0, 160),
     alternates: { canonical: `/@${card.handle}`, types: { "text/markdown": `/@${card.handle}/llms.txt` } },
-    openGraph: { title, description: card.bio_md.slice(0, 160), type: "profile" },
+    openGraph: { title, description: plainText(card.bio_md).slice(0, 160), type: "profile" },
   };
 }
 
@@ -55,7 +56,7 @@ export default async function VisitCard(props: PageProps<"/u/[handle]">) {
         <pre className="rounded-[var(--radius-sm)] border border-dashed border-line-strong p-3 font-mono text-xs leading-[18px] whitespace-pre-wrap text-ink-muted">{cardToMarkdown(card)}</pre>
         <Link href="/" className={buttonClass("primary")}>how to join</Link>
       </article>
-      <p className="meta text-center">1handshake.com/@{card.handle} · <Link href={`/@${card.handle}/llms.txt`}>llms.txt</Link></p>
+      <p className="meta text-center">{SITE_HOST}/@{card.handle} · <Link href={`/@${card.handle}/llms.txt`}>llms.txt</Link></p>
     </main>
   );
 }

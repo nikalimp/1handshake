@@ -22,6 +22,7 @@ await db.exec(readFileSync("supabase/migrations/20261016000000_init.sql", "utf8"
 await db.exec(readFileSync("supabase/migrations/20261016000200_invite_flow.sql", "utf8"));
 await db.exec(readFileSync("supabase/migrations/20261016000300_profile_wall.sql", "utf8"));
 await db.exec(readFileSync("supabase/migrations/20261016000400_connect_feed.sql", "utf8"));
+await db.exec(readFileSync("supabase/migrations/20261016000500_city_names.sql", "utf8"));
 await db.exec(readFileSync("supabase/seed.sql", "utf8"));
 // No broad grants here: the migration's own grants must be enough ("auto-expose tables" off).
 
@@ -34,7 +35,7 @@ const asAdmin = () => db.exec(`reset role; select set_config('request.jwt.claim.
 
 // Founders seeded directly (the first member has no inviter).
 await asAdmin();
-const tb = (await sql(`select id from cities where name = 'tbilisi'`)).rows[0].id;
+const tb = (await sql(`select id from cities where name = 'Tbilisi'`)).rows[0].id;
 for (const n of ["nik", "kate", "ivan", "anna", "david"]) {
   await sql(`insert into profiles (id, handle, name, role, city_id, birth_date) values ($1, $2, $2, 'member', $3, '1990-01-01')`, [ids[n], n, tb]);
 }
