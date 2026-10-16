@@ -1,21 +1,23 @@
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
+import { ConnectCard } from "@/components/connect-card";
 import type { Card } from "@/lib/data";
+
+const first = (c: Card) => (c.name ?? "a member").split(" ")[0];
 
 export function MemberCard({ person, mutuals, avatars }: { person: Card; mutuals: Card[]; avatars?: Map<string, string> }) {
   const src = (c: Card) => (c.avatar_path ? avatars?.get(c.avatar_path) : undefined);
+  const mutualNames = mutuals.length === 1 ? first(mutuals[0]) : `${mutuals.slice(0, -1).map(first).join(", ")} and ${first(mutuals[mutuals.length - 1])}`;
   return (
-    <article className="flex flex-col gap-4 rounded-[var(--radius-lg)] bg-surface p-6 shadow-[var(--shadow-card)]">
+    <ConnectCard personId={person.id} firstName={first(person)} mutualNames={mutualNames || "your mutuals"}>
       <div className="flex items-center gap-4">
         <Avatar name={person.name} size={72} src={src(person)} />
         <div className="min-w-0">
-          <h2 className="text-2xl leading-7 font-extrabold tracking-[-0.02em]">{person.name}</h2>
+          <h2 className="text-2xl leading-7 font-extrabold tracking-[-0.02em]">
+            <Link href={`/people/${person.handle}`}>{person.name}</Link>
+          </h2>
           <p className="text-[15px] leading-5 text-ink-muted">{person.role}</p>
-          {person.handle && (
-            <Link href={`/people/${person.handle}`} className="meta mt-1.5 block">
-              @{person.handle} · 2nd
-            </Link>
-          )}
+          {person.handle && <p className="meta mt-1.5">@{person.handle} · 2nd</p>}
         </div>
       </div>
       {person.bio_md && <p className="line-clamp-3 whitespace-pre-line">{person.bio_md}</p>}
@@ -27,13 +29,8 @@ export function MemberCard({ person, mutuals, avatars }: { person: Card; mutuals
             </span>
           ))}
         </span>
-        <span className="meta">via {mutuals.map((m) => (m.name ?? "").split(" ")[0]).join(", ")}</span>
+        <span className="meta">via {mutuals.map(first).join(", ")}</span>
       </div>
-      {/* skip / connect wire up to request_intro() and hidden in the next step */}
-      <div className="grid grid-cols-2 gap-3">
-        <button className="h-12 rounded-full bg-surface-sunk font-semibold" disabled>skip</button>
-        <button className="h-12 rounded-full bg-fire font-semibold text-on-fire" disabled>connect</button>
-      </div>
-    </article>
+    </ConnectCard>
   );
 }

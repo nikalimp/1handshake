@@ -13,11 +13,16 @@ export default async function ProfilePage() {
   return (
     <>
       <ScreenTitle title="profile">
-        {me.handle && (
-          <Link href={`/@${me.handle}`} className={buttonClass("ghost", "sm")}>
-            public card
+        <div className="flex gap-2">
+          {me.handle && (
+            <Link href={`/@${me.handle}`} className={buttonClass("ghost", "sm")}>
+              public card
+            </Link>
+          )}
+          <Link href="/profile/edit" className={buttonClass("primary", "sm")}>
+            edit
           </Link>
-        )}
+        </div>
       </ScreenTitle>
       {data && <ProfileView data={data} me={me} />}
       <form action="/auth/signout" method="post" className="mt-8">

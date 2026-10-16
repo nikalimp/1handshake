@@ -21,6 +21,7 @@ await db.exec(`
 await db.exec(readFileSync("supabase/migrations/20261016000000_init.sql", "utf8"));
 await db.exec(readFileSync("supabase/migrations/20261016000200_invite_flow.sql", "utf8"));
 await db.exec(readFileSync("supabase/migrations/20261016000300_profile_wall.sql", "utf8"));
+await db.exec(readFileSync("supabase/migrations/20261016000400_connect_feed.sql", "utf8"));
 await db.exec(readFileSync("supabase/seed.sql", "utf8"));
 // No broad grants here: the migration's own grants must be enough ("auto-expose tables" off).
 
@@ -115,8 +116,20 @@ console.log("✓ invite expires after 5 minutes");
 await as("nik");
 const req = (await sql(`select * from request_intro($1)`, [ids.anna])).rows[0];
 await assert.rejects(sql(`select * from request_intro($1)`, [ids.anna]), /one handshake away|duplicate/);
+await as("ivan");
+let toBack = (await sql(`select * from requests_to_back()`)).rows;
+assert.equal(toBack.length, 1);
+assert.equal(toBack[0].backed, false);
 await as("kate");
 await sql(`select back_request($1)`, [req.id]);
+await as("nik");
+const out = (await sql(`select * from outgoing_requests()`)).rows;
+assert.equal(out.length, 1);
+assert.equal(Number(out[0].fires), 1);
+assert.equal(out[0].mutuals.length, 2);
+assert.equal(String((await sql(`select my_birth_date() d`)).rows[0].d).length > 0, true);
+await as("david");
+assert.equal((await sql(`select * from requests_to_back()`)).rows.length, 0, "only mutuals see the request");
 await as("anna");
 let inc = (await sql(`select * from incoming_requests()`)).rows;
 assert.equal(inc.length, 1);
@@ -127,7 +140,7 @@ await assert.rejects(sql(`select respond_request($1, true)`, [req.id]), /not you
 await as("anna");
 await sql(`select respond_request($1, true)`, [req.id]);
 assert.equal((await sql(`select kind from connections where user_a = least($1::uuid,$2::uuid) and user_b = greatest($1::uuid,$2::uuid)`, [ids.nik, ids.anna])).rows[0].kind, "intro");
-console.log("✓ intro: request → 🔥 from kate → anna accepts → 🔗 connected");
+console.log("✓ intro: request → mutuals asked to back it → 🔥 from kate → anna accepts → 🔗 connected; sender sees fires");
 
 // 4. Wall
 await as("kate");
@@ -175,5 +188,18 @@ assert.equal((await sql(`select status from invites where id = $1`, [inv4.id])).
 await sql(`select cancel_invite($1)`, [inv4.id]);
 assert.equal((await sql(`select status from invites where id = $1`, [inv4.id])).rows[0].status, "cancelled");
 console.log("✓ cancel invite: inviter only");
+
+// 8. Feed: events in my circle (kate's posts left with her ghost, so ivan writes one)
+await as("ivan");
+await sql(`insert into wall_posts (wall_owner_id, author_id, body) values (auth.uid(), auth.uid(), 'shipping today')`);
+await as("nik");
+const feed = (await sql(`select kind, actor_id, subject_id, body from feed()`)).rows;
+const kinds = feed.map((f) => f.kind);
+assert.ok(kinds.includes("handshake") && kinds.includes("intro") && kinds.includes("post"));
+assert.ok(feed.some((f) => f.kind === "handshake" && [f.actor_id, f.subject_id].includes(ids.david)), "my new handshake with david");
+// ivan hides his network: his handshake with david shows only because david is also my connection now
+await as(null, "anon");
+await assert.rejects(sql(`select * from feed()`), /permission denied/);
+console.log("✓ feed: handshakes, intros and wall posts around me; members only");
 
 console.log("\nall schema checks passed");
