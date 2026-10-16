@@ -26,7 +26,7 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const signedIn = Boolean(data?.claims);
 
-  const memberArea = ["/connect", "/feed", "/graph", "/profile", "/invite", "/people"].some((p) => request.nextUrl.pathname.startsWith(p));
+  const memberArea = ["/connect", "/feed", "/graph", "/profile", "/invite", "/people", "/admin"].some((p) => request.nextUrl.pathname.startsWith(p));
   if (memberArea && !signedIn) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
