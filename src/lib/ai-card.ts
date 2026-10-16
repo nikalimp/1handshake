@@ -11,8 +11,11 @@ rules:
 - name: the person's name as they'd write it. if they didn't say it, use the google account name.
 - role: what they do, 2–6 words, e.g. "founder, ai notes app" or "senior backend engineer".
 - handle: lowercase latin letters, digits and underscores, 2–30 chars, based on their name.
-- bio_md: markdown, first person, 300–700 characters. short paragraphs, or a "- " list for what they can help with and what they need.
-  concrete over generic: keep projects, companies, numbers and cities they mention. no buzzwords, no emoji, no headings.
+- bio_md: markdown, first person, 400–1200 characters, split into 2–4 sections. each section starts with an H2 line
+  ("## " + 1–4 words, sentence case), then a short paragraph or a "- " list. pick only sections the intro has material for,
+  in this order: "## About" (who they are, what they do now), "## Building" or "## Working on" (current project or company),
+  "## Can help with" (list), "## Looking for" (list). no H1, no other heading levels.
+  concrete over generic: keep projects, companies, numbers and cities they mention. no buzzwords, no emoji.
 - spheres: 1–3 names copied exactly from the list of spheres given, the best fit first. empty if nothing fits.
 - needs: up to 5 short lines (under 80 characters each) of what they're looking for — people, roles, intros, help. only what they said.
 - cans: up to 5 short lines (under 80 characters each) of what they can help others with. only what they said.
@@ -118,8 +121,11 @@ export async function draftCard(transcript: string, googleName: string, email: s
 
 const REVISE = `you edit a member's visit card on 1handshake, a club for people in tech. you get the current card (markdown)
 and what the member just said about how to change it. apply the change and return the whole updated card.
-keep the same rules as the card: english, first person, markdown, 300–700 characters unless they ask otherwise,
-concrete, no buzzwords, no emoji, no headings unless the card already has them. keep everything they didn't ask to change.
+keep the same rules as the card: english, first person, markdown, 400–1200 characters unless they ask otherwise,
+concrete, no buzzwords, no emoji. keep everything they didn't ask to change.
+always return the card organised into 2–4 sections, each starting with an H2 line ("## " + 1–4 words, sentence case)
+followed by a short paragraph or a "- " list — usually "## About", "## Building", "## Can help with", "## Looking for",
+only those with material. if the current card has no sections, restructure it into them. no H1, no other heading levels.
 if what they said is new information rather than an instruction, weave it into the card. don't invent facts.`;
 
 /** Spoken edit + current card → updated card markdown. Claude, else Gemini; null if neither is set up or it fails. */

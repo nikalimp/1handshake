@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { Markdown } from "@/components/markdown";
+import { Progress } from "@/components/progress";
 import { useRecorder } from "@/lib/use-recorder";
 
 type Edit = { value: string; start: number; end: number };
@@ -48,6 +49,9 @@ const TOOLS: { label: string; title: string; run: (e: Edit) => Edit; className?:
   },
 ];
 
+const TIDY =
+  "organise my card into clear sections with H2 headings. keep my facts and my wording as much as possible, fix grammar and typos, don't add anything new.";
+
 /** Markdown textarea with a formatting toolbar and a preview tab. Shows formatting, stores plain markdown. */
 export function MarkdownField({
   value,
@@ -56,7 +60,7 @@ export function MarkdownField({
   maxLength = 4000,
   label = "about",
   defaultView = "write",
-  onVoice,
+  onRewrite,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -64,24 +68,28 @@ export function MarkdownField({
   maxLength?: number;
   label?: string;
   defaultView?: "write" | "preview";
-  /** Voice edit: what was said → the new text (null = couldn't rewrite; the words are appended instead). */
-  onVoice?: (spoken: string) => Promise<string | null>;
+  /** AI edit: an instruction (spoken or built in) → the new text, or null if it couldn't rewrite. Enables 🎙 and ✨. */
+  onRewrite?: (instruction: string) => Promise<string | null>;
 }) {
   const area = useRef<HTMLTextAreaElement>(null);
   const [view, setView] = useState<"write" | "preview">(defaultView);
-  const [rewriting, setRewriting] = useState(false);
+  const [rewriting, setRewriting] = useState<{ at: number; voice: boolean } | null>(null);
   const [undo, setUndo] = useState<string | null>(null);
-  const voice = useRecorder(async (spoken) => {
-    if (!onVoice) return;
-    setRewriting(true);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const rewrite = async (instruction: string, voice: boolean, fallback?: string) => {
+    if (!onRewrite) return;
+    setAiError(null);
+    setRewriting({ at: Date.now(), voice });
     const before = value;
-    const next = await onVoice(spoken).catch(() => null);
-    onChange((next ?? `${before.trim()}${before.trim() ? "\n\n" : ""}${spoken}`).slice(0, maxLength));
+    const next = await onRewrite(instruction).catch(() => null);
+    setRewriting(null);
+    if (next === null && fallback === undefined) return setAiError("couldn't rewrite right now. try again in a minute.");
+    onChange((next ?? `${before.trim()}${before.trim() ? "\n\n" : ""}${fallback}`).slice(0, maxLength));
     setUndo(before);
-    setRewriting(false);
-  }, 120);
-  const listening = voice.state === "recording";
-  const working = voice.state === "transcribing" || rewriting;
+  };
+  const rec = useRecorder((spoken) => void rewrite(spoken, true, spoken), 120);
+  const listening = rec.phase === "recording";
+  const working = rec.phase === "uploading" || rec.phase === "transcribing" || rewriting !== null;
 
   const apply = (run: (e: Edit) => Edit) => {
     const el = area.current;
@@ -110,19 +118,6 @@ export function MarkdownField({
       {view === "write" ? (
         <div className="overflow-hidden rounded-[var(--radius-md)] border border-line bg-surface focus-within:border-line-strong">
           <div className="flex flex-wrap gap-0.5 border-b border-line p-1" role="toolbar" aria-label="formatting">
-            {onVoice && voice.supported && (
-              <button
-                type="button"
-                title="edit with your voice"
-                aria-label={listening ? "stop recording" : "edit with your voice"}
-                aria-pressed={listening}
-                disabled={working}
-                onClick={() => (listening ? voice.stop() : void voice.start())}
-                className={`order-last ml-auto flex h-8 items-center gap-1.5 rounded-full px-3 text-sm font-semibold ${listening ? "bg-ink text-paper" : "bg-fire-soft text-fire-ink"} disabled:opacity-60`}
-              >
-                {working ? "rewriting…" : listening ? `● ${Math.floor(voice.seconds / 60)}:${String(voice.seconds % 60).padStart(2, "0")} stop` : "🎙 say it"}
-              </button>
-            )}
             {TOOLS.map((t) => (
               <button
                 key={t.title}
@@ -137,6 +132,44 @@ export function MarkdownField({
               </button>
             ))}
           </div>
+          {onRewrite && (
+            <div className="flex flex-wrap items-center gap-2 border-b border-line px-2 py-2">
+              {working ? (
+                <div className="w-full px-1 py-0.5">
+                  {rec.phase === "uploading" && <Progress label="sending your voice" from={0} to={15} estMs={2500} startedAt={rec.phaseAt} real={rec.upload} />}
+                  {rec.phase === "transcribing" && <Progress label="turning speech into text" from={15} to={55} estMs={rec.transcribeMs} startedAt={rec.phaseAt} />}
+                  {rewriting && (
+                    <Progress
+                      label={rewriting.voice ? "rewriting your card" : "tidying into sections"}
+                      from={rewriting.voice ? 55 : 0}
+                      to={99}
+                      estMs={7000}
+                      startedAt={rewriting.at}
+                    />
+                  )}
+                </div>
+              ) : (
+                <>
+                  {rec.supported && (
+                    <button
+                      type="button"
+                      aria-label={listening ? "stop recording" : "edit with your voice"}
+                      aria-pressed={listening}
+                      onClick={() => (listening ? rec.stop() : void rec.start())}
+                      className={`flex h-8 items-center gap-1.5 rounded-full px-3 text-sm font-semibold ${listening ? "bg-ink text-paper" : "bg-fire-soft text-fire-ink"}`}
+                    >
+                      {listening ? `● ${Math.floor(rec.seconds / 60)}:${String(rec.seconds % 60).padStart(2, "0")} · stop` : "🎙 say what to change"}
+                    </button>
+                  )}
+                  {!listening && value.trim().length > 40 && (
+                    <button type="button" onClick={() => void rewrite(TIDY, false)} className="flex h-8 items-center gap-1.5 rounded-full bg-surface-sunk px-3 text-sm font-semibold">
+                      ✨ tidy into sections
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
           <textarea
             ref={area}
             value={value}
@@ -152,10 +185,10 @@ export function MarkdownField({
           {value.trim() ? <Markdown source={value} /> : <p className="text-ink-muted">nothing here yet</p>}
         </div>
       )}
-      {(undo !== null || voice.error) && (
+      {(undo !== null || rec.error || aiError) && !working && (
         <p className="flex items-center justify-between gap-3 px-1 text-sm">
-          <span className={voice.error ? "text-fire-ink" : "text-ink-muted"}>{voice.error ?? "rewritten from your voice"}</span>
-          {undo !== null && !voice.error && (
+          <span className={rec.error || aiError ? "text-fire-ink" : "text-ink-muted"}>{rec.error ?? aiError ?? "rewritten by ai — check it before saving"}</span>
+          {undo !== null && !rec.error && !aiError && (
             <button
               type="button"
               className="font-semibold underline underline-offset-2"
@@ -169,7 +202,6 @@ export function MarkdownField({
           )}
         </p>
       )}
-      {onVoice && voice.supported && undo === null && !voice.error && !listening && !working && <p className="meta px-1">tip: tap 🎙 and say what to change — “add that i mentor founders”</p>}
     </div>
   );
 }

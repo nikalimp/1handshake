@@ -159,10 +159,10 @@ export function ProfileEditor({ me, spheres, voice = false }: { me: Me; spheres:
         <MarkdownField
           value={form.bio_md}
           onChange={(v) => set("bio_md", v)}
-          onVoice={
+          onRewrite={
             voice
-              ? async (spoken) => {
-                  const res = await reviseBio(form.bio_md, spoken);
+              ? async (instruction: string) => {
+                  const res = await reviseBio(form.bio_md, instruction);
                   return "bio" in res ? res.bio : null;
                 }
               : undefined

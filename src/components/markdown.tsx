@@ -88,7 +88,7 @@ export function Markdown({ source, className = "" }: { source: string; className
             return b.level === 1 ? (
               <h2 key={k} className="text-[22px] leading-7 font-extrabold tracking-[-0.02em]">{inline(b.text, k)}</h2>
             ) : b.level === 2 ? (
-              <h3 key={k} className="text-lg leading-6 font-bold">{inline(b.text, k)}</h3>
+              <h3 key={k} className="mt-1.5 text-lg leading-6 font-bold first:mt-0">{inline(b.text, k)}</h3>
             ) : (
               <h4 key={k} className="font-bold">{inline(b.text, k)}</h4>
             );

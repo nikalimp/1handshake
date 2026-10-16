@@ -7,12 +7,14 @@ import { Button } from "@/components/button";
 import { type City, CityPicker } from "@/components/city-picker";
 import { Confetti } from "@/components/confetti";
 import { Logo } from "@/components/logo";
+import { Progress } from "@/components/progress";
 import { ListField } from "@/components/list-field";
 import { MarkdownField } from "@/components/markdown-field";
 import { type Sphere, SpherePicker } from "@/components/sphere-picker";
 import { SITE_HOST } from "@/lib/env";
 import { fileToSquareJpeg } from "@/lib/image";
 import { MAX_NEEDS } from "@/lib/needs";
+import { useRecorder } from "@/lib/use-recorder";
 import { createClient } from "@/lib/supabase/client";
 import { joinClub, makeCard, markStep } from "./actions";
 
@@ -25,6 +27,7 @@ export function JoinFlow({ code, uid, inviterName, defaults, guess, serverVoice,
   const [transcript, setTranscript] = useState("");
   const [card, setCard] = useState<CardFields>({ name: defaults.name, role: "", handle: defaults.handle, bio_md: "", spheres: [], needs: [], cans: [] });
   const [ai, setAi] = useState(false);
+  const [draftAt, setDraftAt] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,6 +36,7 @@ export function JoinFlow({ code, uid, inviterName, defaults, guess, serverVoice,
 
   const draft = async () => {
     setError(null);
+    setDraftAt(Date.now());
     setStep("drafting");
     const res = await makeCard(code, transcript);
     if ("error" in res) {
@@ -50,9 +54,10 @@ export function JoinFlow({ code, uid, inviterName, defaults, guess, serverVoice,
       <Logo size={28} className="text-ink" />
       {step === "about" && <AboutStep transcript={transcript} setTranscript={setTranscript} onNext={draft} error={error} serverVoice={serverVoice} />}
       {step === "drafting" && (
-        <div className="mt-24 flex flex-col items-center gap-4 text-center">
+        <div className="mt-24 flex flex-col items-center gap-5 text-center">
           <div className="h-24 w-full animate-pulse rounded-[var(--radius-lg)] bg-surface shadow-[var(--shadow-ai)]" />
-          <p className="font-semibold">ai is drafting your card…</p>
+          <Progress label="ai is drafting your card" from={0} to={99} estMs={9000} startedAt={draftAt} />
+          <p className="meta">writing your card, picking spheres, finding what you need and can</p>
         </div>
       )}
       {step === "card" && (
@@ -100,79 +105,26 @@ function AboutStep({
   serverVoice: boolean;
 }) {
   const rec = useRef<Recognition | null>(null);
-  const recorder = useRef<MediaRecorder | null>(null);
-  const [listening, setListening] = useState(false);
+  const [browserListening, setBrowserListening] = useState(false);
   const [interim, setInterim] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [seconds, setSeconds] = useState(0);
-  const [voiceError, setVoiceError] = useState<string | null>(null);
   // Voice: recorded and transcribed on the server (Gemini) when it's set up, else the browser's own
   // speech recognition (Chrome, Safari). Typing works everywhere.
-  const recorderOk = useSyncExternalStore(noSubscribe, () => serverVoice && typeof MediaRecorder !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia), () => false);
+  const recorder = useRecorder((text) => setTranscript((t) => `${t}${t && !t.endsWith(" ") ? " " : ""}${text}`), 180);
+  const recorderOk = serverVoice && recorder.supported;
   const browserOk = useSyncExternalStore(noSubscribe, () => recognitionCtor() !== null, () => false);
   const supported = recorderOk || browserOk;
+  const listening = recorderOk ? recorder.phase === "recording" : browserListening;
+  const busy = recorder.phase === "uploading" || recorder.phase === "transcribing";
 
-  useEffect(
-    () => () => {
-      rec.current?.stop();
-      if (recorder.current?.state === "recording") recorder.current.stop();
-    },
-    [],
-  );
-  useEffect(() => {
-    if (!listening || !recorderOk) return;
-    const t = setInterval(() => setSeconds((s) => s + 1), 1000);
-    return () => clearInterval(t);
-  }, [listening, recorderOk]);
-  useEffect(() => {
-    if (seconds >= 180 && recorder.current?.state === "recording") recorder.current.stop();
-  }, [seconds]);
-
-  const record = async () => {
-    setVoiceError(null);
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      setVoiceError("microphone is off — allow it in the browser, or type below");
-      return;
-    }
-    const type = ["audio/webm;codecs=opus", "audio/mp4", "audio/ogg;codecs=opus"].find((t) => MediaRecorder.isTypeSupported(t));
-    const r = new MediaRecorder(stream, { ...(type ? { mimeType: type } : {}), audioBitsPerSecond: 32000 });
-    const chunks: Blob[] = [];
-    r.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-    r.onstop = async () => {
-      stream.getTracks().forEach((t) => t.stop());
-      setListening(false);
-      setSeconds(0);
-      const blob = new Blob(chunks, { type: r.mimeType || type || "audio/webm" });
-      if (blob.size < 2000) return;
-      setBusy(true);
-      try {
-        const body = new FormData();
-        body.append("audio", blob, "intro");
-        const res = await fetch("/api/transcribe", { method: "POST", body });
-        const json = (await res.json()) as { text?: string; error?: string };
-        if (json.text) setTranscript((t) => `${t}${t && !t.endsWith(" ") ? " " : ""}${json.text!.trim()}`);
-        else setVoiceError(json.error ?? "couldn't make out the recording. try again or type it.");
-      } catch {
-        setVoiceError("couldn't send the recording. check the connection and try again.");
-      } finally {
-        setBusy(false);
-      }
-    };
-    recorder.current = r;
-    r.start();
-    setListening(true);
-  };
+  useEffect(() => () => rec.current?.stop(), []);
 
   const toggle = () => {
     if (recorderOk) {
-      if (listening) recorder.current?.stop();
-      else void record();
+      if (listening) recorder.stop();
+      else void recorder.start();
       return;
     }
-    if (listening) {
+    if (browserListening) {
       rec.current?.stop();
       return;
     }
@@ -193,13 +145,13 @@ function AboutStep({
       setInterim(live);
     };
     r.onend = () => {
-      setListening(false);
+      setBrowserListening(false);
       setInterim("");
     };
-    r.onerror = () => setListening(false);
+    r.onerror = () => setBrowserListening(false);
     rec.current = r;
     r.start();
-    setListening(true);
+    setBrowserListening(true);
   };
 
   return (
@@ -222,7 +174,7 @@ function AboutStep({
             disabled={busy}
             aria-pressed={listening}
             aria-label={listening ? "stop recording" : "start recording"}
-            className={`grid h-24 w-24 place-items-center rounded-full transition-transform active:scale-95 ${listening ? "bg-ink text-paper" : "bg-fire text-on-fire"}`}
+            className={`grid h-24 w-24 place-items-center rounded-full transition-transform active:scale-95 disabled:opacity-40 ${listening ? "bg-ink text-paper" : "bg-fire text-on-fire"}`}
           >
             {listening ? (
               <span className="h-7 w-7 rounded-md bg-current" />
@@ -233,16 +185,21 @@ function AboutStep({
               </svg>
             )}
           </button>
-          <span className="meta">
-            {busy
-              ? "turning your voice into text…"
-              : listening
+          {busy ? (
+            <div className="w-full max-w-xs">
+              {recorder.phase === "uploading" && <Progress label="sending your voice" from={0} to={25} estMs={2500} startedAt={recorder.phaseAt} real={recorder.upload} />}
+              {recorder.phase === "transcribing" && <Progress label="turning speech into text" from={25} to={99} estMs={recorder.transcribeMs} startedAt={recorder.phaseAt} />}
+            </div>
+          ) : (
+            <span className="meta">
+              {listening
                 ? recorderOk
-                  ? `recording ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")} · tap to stop`
+                  ? `recording ${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, "0")} · tap to stop`
                   : "listening… tap to stop"
                 : "tap to record · or type below"}
-          </span>
-          {voiceError && <span className="text-sm text-fire-ink">{voiceError}</span>}
+            </span>
+          )}
+          {recorder.error && <span className="text-sm text-fire-ink">{recorder.error}</span>}
         </div>
       )}
 

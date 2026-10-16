@@ -56,3 +56,12 @@ body {
   letter-spacing: 0.02em;
   color: var(--ink-muted);
 }
+
+/* Moving highlight on progress bars. */
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[shimmer_1\.4s_linear_infinite\] { animation: none; }
+}
