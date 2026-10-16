@@ -96,11 +96,11 @@ export function GraphView({ meId, nodes, edges, spheres }: { meId: string; nodes
     return new Set([sphere, ...spheres.filter((s) => s.parent_id === sphere).map((s) => s.id)]);
   }, [sphere, spheres]);
 
-  // Stretch the rings to the space we have: an ellipse on tall or wide screens, within reason.
+  // Rings stay round and grow with the space we have.
   const s = Math.min(1.5, Math.max(0.85, Math.min(w, h) / 400));
   const margin = 34 * s;
-  const rx = Math.max(0, Math.min(w / 2 - margin, (h / 2 - margin) * 1.3));
-  const ry = Math.max(0, Math.min(h / 2 - margin, (w / 2 - margin) * 1.3));
+  const rx = Math.max(0, Math.min(w, h) / 2 - margin);
+  const ry = rx;
   const cx = w / 2;
   const cy = h / 2;
   const pos = (id: string) => {
@@ -164,8 +164,8 @@ export function GraphView({ meId, nodes, edges, spheres }: { meId: string; nodes
       <div ref={box} className="relative min-h-0 flex-1">
         {w > 0 && (
           <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="absolute inset-0 block" role="img" aria-label="your network">
-            <ellipse cx={cx} cy={cy} rx={rx * RING1} ry={ry * RING1} fill="none" stroke="var(--line)" strokeDasharray="2 6" />
-            <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill="none" stroke="var(--line)" strokeDasharray="2 6" />
+            <circle cx={cx} cy={cy} r={rx * RING1} fill="none" stroke="var(--line)" strokeDasharray="2 6" />
+            <circle cx={cx} cy={cy} r={rx} fill="none" stroke="var(--line)" strokeDasharray="2 6" />
             {drawn.map((e) => {
               const a = pos(e.src)!;
               const b = pos(e.dst)!;
@@ -263,9 +263,7 @@ export function GraphView({ meId, nodes, edges, spheres }: { meId: string; nodes
                 );
               })}
             </ul>
-          ) : (
-            firstCount > 0 && <p className="meta text-center">tap a person to see who they are · dashed lines are intros, solid ones met in person</p>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
