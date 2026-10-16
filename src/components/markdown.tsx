@@ -48,7 +48,7 @@ function parse(source: string): Block[] {
     let m: RegExpExecArray | null;
     if (!line.trim()) {
       blocks.push({ t: "p", lines: [] }); // paragraph break marker, dropped below if empty
-    } else if ((m = /^(#{1,3})\s+(.*)$/.exec(line))) {
+    } else if ((m = /^(#{1,3})(?!#)\s*(\S.*)$/.exec(line))) {
       blocks.push({ t: "h", level: m[1].length, text: m[2] });
     } else if (/^(-{3,}|\*{3,})$/.test(line.trim())) {
       blocks.push({ t: "hr" });
@@ -123,7 +123,7 @@ export function Markdown({ source, className = "" }: { source: string; className
 /** Markdown → plain text, for short previews (connect cards, meta descriptions). */
 export function plainText(source: string) {
   return source
-    .replace(/^#{1,3}\s+/gm, "")
+    .replace(/^#{1,3}(?!#)\s*/gm, "")
     .replace(/^>\s?/gm, "")
     .replace(/^\s*([-*+]|\d+[.)])\s+/gm, "· ")
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
