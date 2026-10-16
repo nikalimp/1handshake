@@ -2,17 +2,21 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Avatar } from "@/components/avatar";
 import { buttonClass } from "@/components/button";
+import { GoingButton, RegisterLink } from "@/components/event-controls";
+import { EventCover, EventFacts } from "@/components/event-view";
 import { BackButton, RequestActions } from "@/components/feed-controls";
 import { ReportHandshake } from "@/components/moderation";
 import { PushCard } from "@/components/push-card";
 import { ScreenTitle } from "@/components/screen-title";
 import { FireButton } from "@/components/wall-controls";
 import type { Card } from "@/lib/data";
+import { coverUrl, type EventRow, isOver } from "@/lib/event-format";
 
-export type Incoming = { id: string; from_id: string; created_at: string; fires: number; mutuals: string[] };
+export type Incoming = { id: string; from_id: string; created_at: string; fires: number; mutuals: string[]; event_id: string | null };
+export type FeedEvent = EventRow & { city: string | null };
 export type ToBack = { id: string; from_id: string; to_id: string; created_at: string; backed: boolean; fires: number };
 export type Event = {
-  kind: "handshake" | "intro" | "post";
+  kind: "handshake" | "intro" | "post" | "event" | "event_met";
   id: string;
   at: string;
   actor_id: string;
@@ -62,10 +66,11 @@ export type FeedData = {
   people: Map<string, Card>;
   avatars: Map<string, string>;
   selfies: Map<string, string>;
+  eventsById: Map<string, FeedEvent>;
 };
 
 /** The feed screen: requests to answer, intros to back, and what happened around me. */
-export function FeedView({ me, incoming, toBack, events, people, avatars, selfies }: FeedData) {
+export function FeedView({ me, incoming, toBack, events, people, avatars, selfies, eventsById }: FeedData) {
   const face = (id: string, size: number) => {
     const p = people.get(id);
     return <Avatar name={p?.name ?? null} size={size} src={p?.avatar_path ? avatars.get(p.avatar_path) : undefined} />;
@@ -73,7 +78,16 @@ export function FeedView({ me, incoming, toBack, events, people, avatars, selfie
 
   return (
     <>
-      <ScreenTitle title="feed" />
+      <ScreenTitle title="feed">
+        <span className="flex gap-2">
+          <Link href="/events" className={buttonClass("ghost", "sm")}>
+            events
+          </Link>
+          <Link href="/events/new" className={buttonClass("primary", "sm")}>
+            + host event
+          </Link>
+        </span>
+      </ScreenTitle>
       <div className="flex flex-col gap-8">
         <PushCard />
         {incoming.length > 0 && (
@@ -81,6 +95,7 @@ export function FeedView({ me, incoming, toBack, events, people, avatars, selfie
             {incoming.map((r) => {
               const from = people.get(r.from_id);
               const mutualNames = r.mutuals.map((m) => first(people.get(m)));
+              const ev = r.event_id ? eventsById.get(r.event_id) : null;
               return (
                 <article key={r.id} className="flex flex-col gap-4 rounded-[var(--radius-lg)] bg-surface p-5 shadow-[var(--shadow-card)]">
                   <div className="flex items-center gap-3">
@@ -92,6 +107,17 @@ export function FeedView({ me, incoming, toBack, events, people, avatars, selfie
                       <p className="text-sm text-ink-muted">{from?.role}</p>
                     </div>
                   </div>
+                  {r.event_id ? (
+                    <div className="flex items-center gap-2">
+                      {ev?.cover_path ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={coverUrl(ev.cover_path) ?? ""} alt="" className="h-7 w-7 rounded-full object-cover" />
+                      ) : (
+                        <span aria-hidden>🎟</span>
+                      )}
+                      <span className="meta">you were both at {ev?.title ?? "an event"}</span>
+                    </div>
+                  ) : (
                   <div className="flex items-center gap-2">
                     <span className="flex">
                       {r.mutuals.slice(0, 4).map((m, i) => (
@@ -104,6 +130,7 @@ export function FeedView({ me, incoming, toBack, events, people, avatars, selfie
                       via {list(mutualNames)} · {r.fires > 0 ? `🔥 ${r.fires} backed` : "no 🔥 yet"}
                     </span>
                   </div>
+                  )}
                   <RequestActions requestId={r.id} firstName={first(from)} />
                 </article>
               );
@@ -156,6 +183,73 @@ export function FeedView({ me, incoming, toBack, events, people, avatars, selfie
                       <p className="meta">{when(e.at)}</p>
                     </div>
                     {selfie && me.id !== e.actor_id && me.id !== e.subject_id && UUID.test(e.id) && <ReportHandshake inviteId={e.id} />}
+                  </div>
+                </article>
+              );
+            }
+            if (e.kind === "event") {
+              const ev = eventsById.get(e.id);
+              if (!ev) return null;
+              const hosting = ev.host_id === me.id;
+              const open = !ev.cancelled_at && !isOver(ev);
+              return (
+                <article key={`e-${e.id}`} className="overflow-hidden rounded-[var(--radius-lg)] bg-surface shadow-[var(--shadow-card)]">
+                  <Link href={`/events/${ev.slug}`} className="block">
+                    <EventCover path={ev.cover_path} title={ev.title} />
+                  </Link>
+                  <div className="flex flex-col gap-3 p-4">
+                    <div className="flex items-center gap-3">
+                      {face(e.actor_id, 36)}
+                      <div className="min-w-0">
+                        <p className="font-semibold">
+                          🎟 <Name person={actor} me={me} /> {hosting ? "are hosting" : "is hosting"}
+                        </p>
+                        <p className="meta">
+                          {when(e.at)}
+                          {ev.review === "pending" ? " · ⏳ waiting for approval" : ""}
+                          {ev.cancelled_at ? " · cancelled" : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <Link href={`/events/${ev.slug}`} className="text-[22px] leading-7 font-extrabold tracking-[-0.02em] hover:underline">
+                      {ev.title}
+                    </Link>
+                    <EventFacts ev={ev} city={ev.city} compact />
+                    {open ? (
+                      <div className="flex flex-wrap gap-2">
+                        <GoingButton eventId={ev.id} going={e.fired} count={e.fires} size="sm" />
+                        {ev.registration_url && <RegisterLink href={ev.registration_url} size="sm" />}
+                        <Link href={`/events/${ev.slug}`} className={buttonClass("ghost", "sm", "h-10")}>
+                          details
+                        </Link>
+                      </div>
+                    ) : (
+                      <p className="meta">{ev.cancelled_at ? "cancelled" : `over · 🙋 ${e.fires} went`}</p>
+                    )}
+                  </div>
+                </article>
+              );
+            }
+            if (e.kind === "event_met") {
+              const ev = e.body ? eventsById.get(e.body) : null;
+              return (
+                <article key={`m-${e.id}`} className="flex items-center gap-3 rounded-[var(--radius-lg)] bg-surface p-4 shadow-[var(--shadow-card)]">
+                  <span className="flex">
+                    {face(e.actor_id, 36)}
+                    <span className="-ml-2">{face(e.subject_id, 36)}</span>
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-semibold">
+                      🎟 <Name person={actor} me={me} /> &amp; <Name person={subject} me={me} /> met at{" "}
+                      {ev ? (
+                        <Link href={`/events/${ev.slug}`} className="hover:underline">
+                          {ev.title}
+                        </Link>
+                      ) : (
+                        "an event"
+                      )}
+                    </p>
+                    <p className="meta">{when(e.at)}</p>
                   </div>
                 </article>
               );

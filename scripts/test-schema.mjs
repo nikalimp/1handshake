@@ -25,6 +25,7 @@ await db.exec(readFileSync("supabase/migrations/20261016000400_connect_feed.sql"
 await db.exec(readFileSync("supabase/migrations/20261016000500_city_names.sql", "utf8"));
 await db.exec(readFileSync("supabase/migrations/20261016000600_moderation_places.sql", "utf8"));
 await db.exec(readFileSync("supabase/migrations/20261016000700_links_needs_push_ghost.sql", "utf8"));
+await db.exec(readFileSync("supabase/migrations/20261016000800_events.sql", "utf8"));
 await db.exec(readFileSync("supabase/seed.sql", "utf8"));
 await db.exec(readFileSync("supabase/seed_cities.sql", "utf8"));
 // No broad grants here: the migration's own grants must be enough ("auto-expose tables" off).
@@ -276,5 +277,74 @@ assert.deepEqual(ghost2, { name: null, handle: null, links: {}, status: "ghost" 
 assert.equal((await sql(`select count(*)::int c from push_subscriptions`)).rows[0].c, 0);
 assert.equal((await sql(`select count(*)::int c from connections where $1 in (user_a, user_b)`, [ids.ivan])).rows[0].c, before, "the ghost keeps its place in the graph");
 console.log("✓ nearest city, links, needs count, push devices, export, ghost");
+
+// 12. Events: host → review → going → check-in → a guest joins through the event → connect at the event
+await as("nik");
+const soon = (await sql(`select to_char((now() at time zone 'Asia/Bangkok') + interval '1 hour', 'YYYY-MM-DD"T"HH24:MI') t`)).rows[0].t;
+const ev = (await sql(`select * from save_event(null, $1)`, [JSON.stringify({ title: "(BLANK)SPACE Soft Launch", body_md: "**coffee** and people", starts_local: soon, timezone: "Asia/Bangkok", city_id: tb, venue: "(BLANK)SPACE Coffee", price: "free", registration_url: "https://luma.com/rou7cg8i" })])).rows[0];
+assert.match(ev.slug, /^blank-space-soft-launch-[a-z0-9]{4}$/);
+assert.equal(ev.review, "pending");
+const startsIn = (await sql(`select extract(epoch from starts_at - now())::int s from events where id = $1`, [ev.id])).rows[0].s;
+assert.ok(Math.abs(startsIn - 3600) < 90, "local time read in the event's time zone");
+await assert.rejects(sql(`select * from save_event(null, $1)`, [JSON.stringify({ title: "bad", starts_local: soon, timezone: "Mars/Olympus" })]), /time zone/);
+await assert.rejects(sql(`select * from save_event(null, $1)`, [JSON.stringify({ title: "bad link", starts_local: soon, timezone: "UTC", registration_url: "http://x.y" })]), /https/);
+await as(null, "anon");
+assert.equal((await sql(`select count(*)::int c from events_public()`)).rows[0].c, 0, "pending events stay off the calendar");
+await assert.rejects(sql(`select checkin_code from events`), /permission denied/);
+await as("anna"); // nik's connection sees the pending event in the feed
+assert.equal((await sql(`select count(*)::int c from feed() where kind = 'event'`)).rows[0].c, 1);
+await as("david"); // not connected to nik: nothing until it's approved
+assert.equal((await sql(`select count(*)::int c from events`)).rows[0].c, 0);
+await assert.rejects(sql(`select review_event($1, true)`, [ev.id]), /admins only/);
+await as("nik");
+await sql(`select review_event($1, true)`, [ev.id]);
+const code = (await sql(`select event_checkin_code($1) c`, [ev.id])).rows[0].c;
+await as("david");
+assert.equal((await sql(`select event_checkin_code($1) c`, [ev.id])).rows[0].c, null, "only the host reads the check-in code");
+await sql(`select set_going($1, true)`, [ev.id]);
+assert.deepEqual((await sql(`select kind, fires::int, fired from feed() where kind = 'event'`)).rows, [{ kind: "event", fires: 2, fired: true }]);
+await as(null, "anon");
+const pub = (await sql(`select title, city, going, here, host_handle from events_public()`)).rows;
+assert.deepEqual(pub, [{ title: "(BLANK)SPACE Soft Launch", city: "Tbilisi", going: 2, here: 0, host_handle: "nik" }]);
+assert.equal((await sql(`select state from event_by_code($1)`, [code])).rows[0].state, "open");
+ids.walkin = crypto.randomUUID();
+await asAdmin();
+await sql(`insert into auth.users (id) values ($1)`, [ids.walkin]);
+await as("walkin"); // signed in with google, not a member: the event QR doesn't let them in
+await assert.rejects(sql(`select * from event_check_in($1)`, [code]), /not a member/);
+for (const who of ["guest", "anna", "david"]) {
+  await as(who);
+  assert.equal((await sql(`select slug from event_check_in($1)`, [code])).rows[0].slug, ev.slug);
+}
+await as("guest");
+assert.deepEqual((await sql(`select person from people_from_events() order by person`)).rows.map((r) => name(r.person)).sort(), ["anna", "david"]);
+assert.equal((await sql(`select request_event_connect($1, $2) r`, [ids.anna, ev.id])).rows[0].r, "requested");
+await assert.rejects(sql(`select request_event_connect($1, $2)`, [ids.nik, ev.id]), /not at this event together/, "nik didn't check in");
+await as("anna");
+assert.equal((await sql(`select event_id from incoming_requests()`)).rows[0].event_id, ev.id);
+assert.equal((await sql(`select request_event_connect($1, $2) r`, [ids.guest, ev.id])).rows[0].r, "connected", "both tapped connect");
+assert.deepEqual((await sql(`select kind, event_id from connections where $1 in (user_a, user_b) and $2 in (user_a, user_b)`, [ids.anna, ids.guest])).rows, [{ kind: "met", event_id: ev.id }]);
+assert.ok((await sql(`select body from feed() where kind = 'event_met'`)).rows.some((r) => r.body === ev.id));
+await as("david");
+await sql(`select request_event_connect($1, $2)`, [ids.guest, ev.id]);
+await as("guest");
+const req12 = (await sql(`select id from incoming_requests() where event_id is not null`)).rows[0].id;
+await sql(`select respond_request($1, true)`, [req12]);
+assert.equal((await sql(`select kind from connections where $1 in (user_a, user_b) and $2 in (user_a, user_b)`, [ids.david, ids.guest])).rows[0].kind, "met");
+assert.equal((await sql(`select count(*)::int c from people_from_events()`)).rows[0].c, 0, "everyone from the event is connected now");
+// codes: the host can replace a leaked one; check-in waits for the event's time
+await as("nik");
+const fresh = (await sql(`select new_checkin_code($1) c`, [ev.id])).rows[0].c;
+assert.notEqual(fresh, code);
+const later = (await sql(`select * from save_event(null, $1)`, [JSON.stringify({ title: "Next month", starts_local: "2030-01-01T19:00", timezone: "UTC" })])).rows[0];
+await sql(`select review_event($1, true)`, [later.id]);
+const laterCode = (await sql(`select event_checkin_code($1) c`, [later.id])).rows[0].c;
+await as("anna");
+await assert.rejects(sql(`select * from event_check_in($1)`, [code]), /code not found/, "the old code stops working");
+await assert.rejects(sql(`select * from event_check_in($1)`, [laterCode]), /not open yet/);
+await assert.rejects(sql(`select cancel_event($1)`, [later.id]), /not your event/);
+const exp2 = (await sql(`select my_export() e`)).rows[0].e;
+assert.equal(exp2.events_attended.length, 1);
+console.log("✓ events: host → admin approves → going → members check in with the QR (non-members can't) → connect at the event");
 
 console.log("\nall schema checks passed");

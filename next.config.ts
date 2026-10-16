@@ -6,8 +6,8 @@ import type { NextConfig } from "next";
 const assetPrefix = process.env.ASSET_PREFIX ?? (process.env.VERCEL_ENV === "production" ? "https://app.1handshake.com" : undefined);
 
 // Once the main site serves the cards (NEXT_PUBLIC_CARD_URL=https://1handshake.com), cards live only there:
-// the app sends its own /@handle over. The site proxies cards back
-// to the app's internal /u/:handle path, so this never loops.
+// the app sends its own /@handle and /e/:slug over. The site proxies them back
+// to the app's internal /u/:handle and /ev/:slug paths, so this never loops.
 const cardUrl = (process.env.NEXT_PUBLIC_CARD_URL ?? "").replace(/\/$/, "");
 const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "");
 const mainUrl = (process.env.NEXT_PUBLIC_MAIN_URL ?? "https://1handshake.com").replace(/\/$/, "");
@@ -36,13 +36,15 @@ const nextConfig: NextConfig = {
       ...legal,
       { source: "/@:handle/llms.txt", destination: `${cardUrl}/@:handle/llms.txt`, permanent: true },
       { source: "/@:handle", destination: `${cardUrl}/@:handle`, permanent: true },
+      { source: "/e/:slug", destination: `${cardUrl}/e/:slug`, permanent: true },
     ];
   },
-  // Public visit cards: /@handle (and /@handle/llms.txt) are served by /u/:handle.
+  // Public visit cards: /@handle (and /@handle/llms.txt) are served by /u/:handle; public event pages /e/:slug by /ev/:slug.
   async rewrites() {
     return [
       { source: "/@:handle/llms.txt", destination: "/u/:handle/llms.txt" },
       { source: "/@:handle", destination: "/u/:handle" },
+      { source: "/e/:slug", destination: "/ev/:slug" },
     ];
   },
   // Fonts and scripts requested from 1handshake.com need CORS.

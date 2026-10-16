@@ -61,6 +61,7 @@ export function MarkdownField({
   label = "about",
   defaultView = "write",
   onRewrite,
+  placeholder = "who you are, what you do, what you need, how you can help",
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -70,6 +71,7 @@ export function MarkdownField({
   defaultView?: "write" | "preview";
   /** AI edit: an instruction (spoken or built in) → the new text, or null if it couldn't rewrite. Enables 🎙 and ✨. */
   onRewrite?: (instruction: string) => Promise<string | null>;
+  placeholder?: string;
 }) {
   const area = useRef<HTMLTextAreaElement>(null);
   const [view, setView] = useState<"write" | "preview">(defaultView);
@@ -176,7 +178,7 @@ export function MarkdownField({
             onChange={(e) => onChange(e.target.value)}
             rows={rows}
             maxLength={maxLength}
-            placeholder="who you are, what you do, what you need, how you can help"
+            placeholder={placeholder}
             className="block w-full resize-y bg-transparent px-4 py-3 text-[15px] leading-[22px] outline-none placeholder:text-ink-muted focus-visible:outline-none"
           />
         </div>

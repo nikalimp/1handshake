@@ -7,11 +7,12 @@ import type { Side } from "@/lib/match";
 
 const first = (c: Card) => (c.name ?? "a member").split(" ")[0];
 
-export function MemberCard({ person, mutuals, avatars, match, side }: { person: Card; mutuals: Card[]; avatars?: Map<string, string>; match?: string; side?: Side }) {
+/** Someone to connect with: one handshake away (via mutuals) or from an event we both checked in at. */
+export function MemberCard({ person, mutuals, avatars, match, side, event }: { person: Card; mutuals: Card[]; avatars?: Map<string, string>; match?: string; side?: Side; event?: { id: string; title: string; cover: string | null } }) {
   const src = (c: Card) => (c.avatar_path ? avatars?.get(c.avatar_path) : undefined);
-  const mutualNames = mutuals.length === 1 ? first(mutuals[0]) : `${mutuals.slice(0, -1).map(first).join(", ")} and ${first(mutuals[mutuals.length - 1])}`;
+  const mutualNames = mutuals.length === 0 ? "" : mutuals.length === 1 ? first(mutuals[0]) : `${mutuals.slice(0, -1).map(first).join(", ")} and ${first(mutuals[mutuals.length - 1])}`;
   return (
-    <ConnectCard personId={person.id} firstName={first(person)} mutualNames={mutualNames || "your mutuals"}>
+    <ConnectCard personId={person.id} firstName={first(person)} mutualNames={mutualNames || "your mutuals"} eventId={event?.id}>
       {match && (
         <p className="-mt-1 flex items-start gap-2 rounded-[var(--radius-md)] bg-fire-soft px-3.5 py-2.5 text-sm text-fire-ink">
           <span className="shrink-0 font-bold">match</span>
@@ -25,7 +26,7 @@ export function MemberCard({ person, mutuals, avatars, match, side }: { person: 
             <Link href={`/people/${person.handle}`}>{person.name}</Link>
           </h2>
           <p className="text-[15px] leading-5 text-ink-muted">{person.role}</p>
-          {person.handle && <p className="meta mt-1.5">@{person.handle} · 2nd</p>}
+          {person.handle && <p className="meta mt-1.5">@{person.handle} · {event ? "met at an event" : "2nd"}</p>}
         </div>
       </div>
       {person.bio_md && <p className="line-clamp-3 whitespace-pre-line">{plainText(person.bio_md)}</p>}
@@ -45,6 +46,17 @@ export function MemberCard({ person, mutuals, avatars, match, side }: { person: 
           )}
         </dl>
       )}
+      {event ? (
+        <div className="flex items-center gap-2 border-t border-line pt-4">
+          {event.cover ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={event.cover} alt="" className="h-7 w-7 rounded-full object-cover" />
+          ) : (
+            <span aria-hidden>🎟</span>
+          )}
+          <span className="meta">you were both at {event.title}</span>
+        </div>
+      ) : (
       <div className="flex items-center gap-2 border-t border-line pt-4">
         <span className="flex">
           {mutuals.slice(0, 3).map((m, i) => (
@@ -55,6 +67,7 @@ export function MemberCard({ person, mutuals, avatars, match, side }: { person: 
         </span>
         <span className="meta">via {mutuals.map(first).join(", ")}</span>
       </div>
+      )}
     </ConnectCard>
   );
 }

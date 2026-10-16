@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 
 // Google sends the member back here. We exchange the code for a session, then:
 // - invite flow (`next` starts with /i/) → continue registration;
+// - event check-in (/in/) by someone who isn't a member → back to the QR page with a note;
 // - existing member → their `next` page;
 // - signed in but not a member → back to the landing page with a note.
 export async function GET(request: NextRequest) {
@@ -22,6 +23,7 @@ export async function GET(request: NextRequest) {
   const { data: profile } = await supabase.from("profiles").select("status").eq("id", data.user.id).maybeSingle();
   if (!profile || profile.status !== "active") {
     await supabase.auth.signOut();
+    if (next.startsWith("/in/")) return NextResponse.redirect(`${origin}${next.split("?")[0]}?error=members-only`);
     return NextResponse.redirect(`${origin}/?error=members-only`);
   }
   return NextResponse.redirect(`${origin}${next}`);

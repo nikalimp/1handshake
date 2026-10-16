@@ -1,12 +1,15 @@
 "use client";
 import type { ReactNode } from "react";
 import { useState, useTransition } from "react";
-import { requestIntro, skipPerson, unskipPerson } from "@/app/(app)/connect/actions";
+import { requestEventConnect, requestIntro, skipPerson, unskipPerson } from "@/app/(app)/connect/actions";
 
-type State = "idle" | "skipped" | "requested";
+type State = "idle" | "skipped" | "requested" | "connected";
 
-/** A person in connect: their card, then skip / connect. Reacts right away, the server follows. */
-export function ConnectCard({ personId, firstName, mutualNames, children }: { personId: string; firstName: string; mutualNames: string; children: ReactNode }) {
+/**
+ * A person in connect: their card, then skip / connect. Reacts right away, the server follows.
+ * With `eventId` (someone from the same event) connect asks them directly, no mutuals involved.
+ */
+export function ConnectCard({ personId, firstName, mutualNames, eventId, children }: { personId: string; firstName: string; mutualNames: string; eventId?: string; children: ReactNode }) {
   const [state, setState] = useState<State>("idle");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -32,9 +35,13 @@ export function ConnectCard({ personId, firstName, mutualNames, children }: { pe
   return (
     <article className="flex flex-col gap-4 rounded-[var(--radius-lg)] bg-surface p-6 shadow-[var(--shadow-card)]">
       {children}
-      {state === "requested" ? (
+      {state === "connected" ? (
+        <p className="rounded-[var(--radius-md)] bg-fire-soft px-4 py-3 text-sm text-fire-ink">🤝 you and {firstName} are connected — you both tapped connect.</p>
+      ) : state === "requested" ? (
         <p className="rounded-[var(--radius-md)] bg-fire-soft px-4 py-3 text-sm text-fire-ink">
-          request sent. {mutualNames} will be asked to back it with a 🔥 — {firstName} sees it in their feed.
+          {eventId
+            ? `request sent. ${firstName} sees it in their feed — if they tap connect too, you're connected.`
+            : `request sent. ${mutualNames} will be asked to back it with a 🔥 — ${firstName} sees it in their feed.`}
         </p>
       ) : (
         <>
@@ -58,6 +65,12 @@ export function ConnectCard({ personId, firstName, mutualNames, children }: { pe
               onClick={() =>
                 start(async () => {
                   setError(null);
+                  if (eventId) {
+                    const res = await requestEventConnect(personId, eventId);
+                    if ("error" in res) setError(res.error);
+                    else setState(res.state);
+                    return;
+                  }
                   const res = await requestIntro(personId);
                   if ("error" in res) setError(res.error);
                   else setState("requested");

@@ -47,3 +47,28 @@ export async function requestIntro(personId: string): Promise<{ ok: true } | { e
   revalidatePath("/feed");
   return { ok: true };
 }
+
+/** Connect with someone from the same event: no mutuals needed. If they tapped connect too, you're connected now. */
+export async function requestEventConnect(personId: string, eventId: string): Promise<{ state: "requested" | "connected" } | { error: string }> {
+  const me = await getMe();
+  if (!me) return { error: "members only" };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("request_event_connect", { p_to: personId, p_event: eventId });
+  if (error) return { error: error.message.includes("not at this event") ? "you weren't checked in at this event together" : "couldn't connect. try again." };
+  const state = data === "connected" ? "connected" : "requested";
+  after(async () => {
+    const admin = createAdminClient();
+    if (!admin) return;
+    const { data: ev } = await admin.from("events").select("title").eq("id", eventId).maybeSingle<{ title: string }>();
+    await sendPush(
+      [personId],
+      state === "connected"
+        ? { title: `you and ${firstName(me.name)} are connected 🎟`, body: `met at ${ev?.title ?? "the event"}`, url: me.handle ? `/people/${me.handle}` : "/feed", tag: `ev-${personId}-${me.id}` }
+        : { title: `${firstName(me.name)} wants to connect`, body: `you were both at ${ev?.title ?? "the event"} · open your feed to answer`, url: "/feed", tag: `ev-${me.id}-${personId}` },
+    );
+  });
+  revalidatePath("/connect");
+  revalidatePath("/feed");
+  revalidatePath("/graph");
+  return { state };
+}
