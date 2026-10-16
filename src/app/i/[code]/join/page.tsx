@@ -22,7 +22,6 @@ export default async function Join(props: PageProps<"/i/[code]/join">) {
   const problem = inviteProblem(inv);
   if (!inv || problem) return <InviteProblem title={problem ?? "this code doesn't exist"} />;
 
-  const { data: cities } = await supabase.from("cities").select("id, name").order("name").returns<{ id: number; name: string }[]>();
   const meta = user.user_metadata as { full_name?: string; name?: string };
   const googleName = meta.full_name ?? meta.name ?? "";
 
@@ -32,7 +31,6 @@ export default async function Join(props: PageProps<"/i/[code]/join">) {
       uid={user.id}
       inviterName={inv.inviter_name ?? "your inviter"}
       defaults={{ name: googleName, handle: handleFrom(googleName || (user.email ?? "").split("@")[0]) }}
-      cities={cities ?? []}
     />
   );
 }

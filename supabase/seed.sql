@@ -22,7 +22,7 @@ insert into public.cities (name, country) values
   ('Hong Kong', 'China'),
   ('New York', 'USA'),
   ('San Francisco', 'USA')
-on conflict (name) do nothing;
+on conflict (name, country) do nothing;
 
 insert into public.spheres (parent_id, name) values (null, 'Engineering') on conflict do nothing;
 insert into public.spheres (parent_id, name)

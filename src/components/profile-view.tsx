@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Avatar } from "@/components/avatar";
 import { Markdown } from "@/components/markdown";
+import { ReportHandshake } from "@/components/moderation";
 import { FireButton, RemovePost, WallComposer } from "@/components/wall-controls";
 import type { Card } from "@/lib/data";
 import type { LoadedProfile } from "@/lib/profile";
@@ -70,9 +71,9 @@ export function ProfileView({ data, me, actions }: { data: LoadedProfile; me: Ca
                 ) : (
                   <div className="grid aspect-[2/1] w-full place-items-center bg-surface-sunk text-5xl">🤝</div>
                 )}
-                <div className="flex items-center gap-3 p-4">
+                <div className="flex flex-wrap items-center gap-3 p-4">
                   <Avatar name={other?.name ?? null} size={36} src={avatars.get(other?.avatar_path ?? "")} />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="font-semibold">
                       🤝 {firstName(person)} &amp; <PersonLink person={other}>{other?.name ?? "a member"}</PersonLink> met in person
                     </p>
@@ -81,6 +82,7 @@ export function ProfileView({ data, me, actions }: { data: LoadedProfile; me: Ca
                       {when(item.at)}
                     </p>
                   </div>
+                  {selfie && !isMe && item.other_id !== me.id && <ReportHandshake inviteId={item.id} />}
                 </div>
               </article>
             );

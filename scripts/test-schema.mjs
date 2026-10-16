@@ -23,7 +23,9 @@ await db.exec(readFileSync("supabase/migrations/20261016000200_invite_flow.sql",
 await db.exec(readFileSync("supabase/migrations/20261016000300_profile_wall.sql", "utf8"));
 await db.exec(readFileSync("supabase/migrations/20261016000400_connect_feed.sql", "utf8"));
 await db.exec(readFileSync("supabase/migrations/20261016000500_city_names.sql", "utf8"));
+await db.exec(readFileSync("supabase/migrations/20261016000600_moderation_places.sql", "utf8"));
 await db.exec(readFileSync("supabase/seed.sql", "utf8"));
+await db.exec(readFileSync("supabase/seed_cities.sql", "utf8"));
 // No broad grants here: the migration's own grants must be enough ("auto-expose tables" off).
 
 const ids = {};
@@ -202,5 +204,43 @@ assert.ok(feed.some((f) => f.kind === "handshake" && [f.actor_id, f.subject_id].
 await as(null, "anon");
 await assert.rejects(sql(`select * from feed()`), /permission denied/);
 console.log("✓ feed: handshakes, intros and wall posts around me; members only");
+
+// 9. Places: the world list, one name in several countries
+await asAdmin();
+const nCities = (await sql(`select count(*)::int c from cities`)).rows[0].c;
+assert.ok(nCities > 8000, "world cities loaded");
+assert.equal((await sql(`select count(*)::int c from cities where name = 'Tbilisi'`)).rows[0].c, 1, "known cities are not duplicated");
+assert.ok((await sql(`select count(*)::int c from spheres where parent_id is not null`)).rows[0].c > 80);
+console.log("✓ places:", nCities, "cities, more spheres");
+
+// 10. Fake handshake: 3 reports hide the selfie, an admin cancels; parties can remove a connection
+await as("nik");
+const inv5 = (await sql(`select * from create_invite('nik/fake.jpg')`)).rows[0];
+await as("anna");
+await sql(`select handshake_with_invite($1)`, [inv5.code]); // anna ↔ nik met in person
+for (const who of ["ivan", "david", "guest"]) {
+  await as(who);
+  await sql(`select report_handshake($1)`, [inv5.id]);
+}
+await as("ivan");
+await sql(`select report_handshake($1)`, [inv5.id]); // the same person twice counts once
+await as("anna");
+const annaWall = (await sql(`select selfie_path from wall($1) where kind = 'handshake' and id = $2`, [ids.anna, inv5.id])).rows[0];
+assert.equal(annaWall.selfie_path, null, "selfie hidden after 3 reports");
+await assert.rejects(sql(`select * from admin_resolve_handshake($1, true)`, [inv5.id]), /admins only/);
+assert.equal((await sql(`select count(*)::int c from admin_flags()`)).rows[0].c, 0, "non-admins see an empty queue");
+await asAdmin();
+await sql(`insert into admins (profile_id) values ($1)`, [ids.nik]);
+await as("nik");
+const flags = (await sql(`select * from admin_flags()`)).rows;
+assert.equal(flags.length, 1);
+assert.equal(Number(flags[0].reports), 3);
+await sql(`select admin_resolve_handshake($1, true)`, [inv5.id]);
+assert.equal((await sql(`select is_connected($1,$2) c`, [ids.nik, ids.anna])).rows[0].c, true, "anna and nik stay connected through their earlier intro");
+assert.equal((await sql(`select count(*)::int c from connections where invite_id = $1`, [inv5.id])).rows[0].c, 0, "the fake handshake is gone");
+await as("david");
+await sql(`select remove_connection($1)`, [ids.nik]);
+assert.equal((await sql(`select is_connected($1,$2) c`, [ids.nik, ids.david])).rows[0].c, false);
+console.log("✓ fake handshake: 3 reports hide the selfie → admin cancels; either person can remove a connection");
 
 console.log("\nall schema checks passed");

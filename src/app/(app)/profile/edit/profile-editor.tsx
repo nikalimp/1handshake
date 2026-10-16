@@ -1,9 +1,11 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/avatar";
 import { Button, buttonClass } from "@/components/button";
+import { type City, CityPicker } from "@/components/city-picker";
+import { Combobox, type Option } from "@/components/combobox";
 import { MarkdownField } from "@/components/markdown-field";
 import { SITE_HOST } from "@/lib/env";
 import { fileToSquareJpeg } from "@/lib/image";
@@ -16,7 +18,7 @@ type Me = {
   role: string;
   handle: string;
   bio_md: string;
-  city_id: number | null;
+  city: City | null;
   birth_date: string;
   avatar_path: string | null;
   avatar_url: string | null;
@@ -46,7 +48,7 @@ function Toggle({ on, onChange, disabled, label, hint }: { on: boolean; onChange
   );
 }
 
-export function ProfileEditor({ me, cities, spheres }: { me: Me; cities: { id: number; name: string }[]; spheres: Sphere[] }) {
+export function ProfileEditor({ me, spheres }: { me: Me; spheres: Sphere[] }) {
   const router = useRouter();
   const [supabase] = useState(createClient);
   const file = useRef<HTMLInputElement>(null);
@@ -55,6 +57,21 @@ export function ProfileEditor({ me, cities, spheres }: { me: Me; cities: { id: n
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const [today] = useState(() => new Date().toISOString().slice(0, 10));
+
+  const sphereName = useMemo(() => new Map(spheres.map((s) => [s.id, s.name])), [spheres]);
+  const searchSpheres = useCallback(
+    (q: string): Option[] => {
+      const term = q.trim().toLowerCase();
+      const parents = spheres.filter((p) => p.parent_id === null);
+      return parents.flatMap((p) =>
+        spheres
+          .filter((s) => s.parent_id === p.id && (!term || s.name.toLowerCase().includes(term) || p.name.toLowerCase().includes(term)))
+          .sort((a, b) => Number(!a.name.toLowerCase().startsWith(term)) - Number(!b.name.toLowerCase().startsWith(term)))
+          .map((s) => ({ id: s.id, label: s.name, group: p.name, disabled: form.spheres.includes(s.id), hint: form.spheres.includes(s.id) ? "added" : undefined })),
+      );
+    },
+    [spheres, form.spheres],
+  );
 
   const set = <K extends keyof Me>(k: K, v: Me[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -82,7 +99,7 @@ export function ProfileEditor({ me, cities, spheres }: { me: Me; cities: { id: n
         role: form.role,
         handle: form.handle,
         bio_md: form.bio_md,
-        city_id: form.city_id,
+        city_id: form.city?.id ?? null,
         birth_date: form.birth_date || null,
         avatar_path: form.avatar_path,
         open_to_hiring: form.open_to_hiring,
@@ -150,17 +167,10 @@ export function ProfileEditor({ me, cities, spheres }: { me: Me; cities: { id: n
       </section>
 
       <section className="flex flex-col gap-4 rounded-[var(--radius-lg)] bg-surface p-5 shadow-[var(--shadow-card)]">
-        <label className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5">
           <span className="meta">city</span>
-          <select value={form.city_id ?? ""} onChange={(e) => set("city_id", e.target.value ? Number(e.target.value) : null)} className={field}>
-            <option value="">pick your city</option>
-            {cities.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          <CityPicker value={form.city} onChange={(c) => set("city", c)} className={field} />
+        </div>
         <label className="flex flex-col gap-1.5">
           <span className="meta">birthday · only you see it</span>
           <input type="date" value={form.birth_date} onChange={(e) => set("birth_date", e.target.value)} max={today} className={field} />
@@ -170,36 +180,28 @@ export function ProfileEditor({ me, cities, spheres }: { me: Me; cities: { id: n
       <section className="flex flex-col gap-3 rounded-[var(--radius-lg)] bg-surface p-5 shadow-[var(--shadow-card)]" aria-label="spheres">
         <div>
           <p className="font-semibold">what you work in</p>
-          <p className="text-sm text-ink-muted">up to 3 · the first one is your main sphere · members filter the graph by it</p>
+          <p className="text-sm text-ink-muted">up to 3 · ★ is your main one, tap another to make it main · members filter the graph by it</p>
         </div>
-        {spheres
-          .filter((p) => p.parent_id === null)
-          .map((p) => (
-            <div key={p.id} className="flex flex-col gap-1.5">
-              <span className="meta">{p.name}</span>
-              <div className="flex flex-wrap gap-1.5">
-                {spheres
-                  .filter((s) => s.parent_id === p.id)
-                  .map((s) => {
-                    const at = form.spheres.indexOf(s.id);
-                    const on = at !== -1;
-                    return (
-                      <button
-                        key={s.id}
-                        type="button"
-                        aria-pressed={on}
-                        disabled={!on && form.spheres.length >= 3}
-                        onClick={() => set("spheres", on ? form.spheres.filter((x) => x !== s.id) : [...form.spheres, s.id])}
-                        className={`rounded-full px-3 py-1.5 text-sm transition-colors disabled:opacity-40 ${on ? "bg-fire font-semibold text-on-fire" : "bg-surface-sunk"}`}
-                      >
-                        {at === 0 && "★ "}
-                        {s.name}
-                      </button>
-                    );
-                  })}
-              </div>
-            </div>
-          ))}
+        {form.spheres.length > 0 && (
+          <ul className="flex flex-wrap gap-1.5">
+            {form.spheres.map((id, i) => (
+              <li key={id} className={`flex items-center rounded-full text-sm ${i === 0 ? "bg-fire font-semibold text-on-fire" : "bg-surface-sunk"}`}>
+                <button type="button" disabled={i === 0} onClick={() => set("spheres", [id, ...form.spheres.filter((x) => x !== id)])} className="py-1.5 pl-3" title={i === 0 ? "your main sphere" : "make it main"}>
+                  {i === 0 && "★ "}
+                  {sphereName.get(id)}
+                </button>
+                <button type="button" aria-label={`remove ${sphereName.get(id)}`} onClick={() => set("spheres", form.spheres.filter((x) => x !== id))} className="py-1.5 pr-3 pl-2 opacity-70 hover:opacity-100">
+                  ✕
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {form.spheres.length < 3 ? (
+          <Combobox label="add a sphere" placeholder={form.spheres.length ? "add another, e.g. product, ios, seo" : "type, e.g. product, ios, seo"} value={null} clearOnSelect onChange={(o) => o && set("spheres", [...form.spheres, o.id])} search={searchSpheres} className={field} />
+        ) : (
+          <p className="meta">that&apos;s 3 · remove one to pick another</p>
+        )}
       </section>
 
       <section className="flex flex-col divide-y divide-line rounded-[var(--radius-lg)] bg-surface px-5 py-2 shadow-[var(--shadow-card)]">

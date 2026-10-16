@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Avatar } from "@/components/avatar";
 import { buttonClass } from "@/components/button";
 import { BackButton, RequestActions } from "@/components/feed-controls";
+import { ReportHandshake } from "@/components/moderation";
 import { ScreenTitle } from "@/components/screen-title";
 import { FireButton } from "@/components/wall-controls";
 import type { Card } from "@/lib/data";
@@ -21,6 +22,7 @@ export type Event = {
   fired: boolean;
 };
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const day = new Intl.DateTimeFormat("en", { day: "numeric", month: "short" });
 const when = (iso: string) => {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -140,17 +142,18 @@ export function FeedView({ me, incoming, toBack, events, people, avatars, selfie
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={selfie} alt={`${actor?.name ?? "a member"} and ${subject?.name ?? "a member"} met in person`} className="aspect-square w-full object-cover" />
                   )}
-                  <div className="flex items-center gap-3 p-4">
+                  <div className="flex flex-wrap items-center gap-3 p-4">
                     <span className="flex">
                       {face(e.actor_id, 36)}
                       <span className="-ml-2">{face(e.subject_id, 36)}</span>
                     </span>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="font-semibold">
                         🤝 <Name person={actor} me={me} /> &amp; <Name person={subject} me={me} /> met in person
                       </p>
                       <p className="meta">{when(e.at)}</p>
                     </div>
+                    {selfie && me.id !== e.actor_id && me.id !== e.subject_id && UUID.test(e.id) && <ReportHandshake inviteId={e.id} />}
                   </div>
                 </article>
               );

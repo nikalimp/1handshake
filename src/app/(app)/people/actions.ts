@@ -36,3 +36,26 @@ export async function removePost(postId: string) {
   revalidatePath("/profile");
   revalidatePath("/people/[handle]", "page");
 }
+
+// Moderation. A member flags a handshake selfie that looks fake; at 3 reports from different
+// people the selfie hides and the handshake waits for an admin. Parties can't report their own.
+export async function reportHandshake(inviteId: string): Promise<{ ok: true; reports: number } | { error: string }> {
+  const me = await getMe();
+  if (!me) return { error: "members only" };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("report_handshake", { p_invite: inviteId });
+  if (error) return { error: "couldn't send the report. try again." };
+  return { ok: true, reports: Number(data) };
+}
+
+// Either of the two people can remove their connection.
+export async function removeConnection(otherId: string) {
+  const me = await getMe();
+  if (!me) return;
+  const supabase = await createClient();
+  await supabase.rpc("remove_connection", { p_other: otherId });
+  revalidatePath("/profile");
+  revalidatePath("/people/[handle]", "page");
+  revalidatePath("/graph");
+  revalidatePath("/feed");
+}

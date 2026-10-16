@@ -25,10 +25,6 @@ export default async function ProfilePage() {
         </div>
       </ScreenTitle>
       {data && <ProfileView data={data} me={me} />}
-      <form action="/auth/signout" method="post" className="mt-8">
-        <button className={buttonClass("secondary", "sm")}>sign out</button>
-      </form>
-      <p className="meta mt-8 text-center">open source · v0.1.0</p>
     </>
   );
 }

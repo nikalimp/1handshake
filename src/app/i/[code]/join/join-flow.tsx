@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/button";
+import { type City, CityPicker } from "@/components/city-picker";
 import { Confetti } from "@/components/confetti";
 import { Logo } from "@/components/logo";
 import { MarkdownField } from "@/components/markdown-field";
@@ -12,12 +13,11 @@ import { fileToSquareJpeg } from "@/lib/image";
 import { createClient } from "@/lib/supabase/client";
 import { joinClub, makeCard, markStep } from "./actions";
 
-type City = { id: number; name: string };
 type Step = "about" | "drafting" | "card" | "in";
 
 const PROMPTS = ["who you are", "what you do", "what you need", "what you can help with"];
 
-export function JoinFlow({ code, uid, inviterName, defaults, cities }: { code: string; uid: string; inviterName: string; defaults: { name: string; handle: string }; cities: City[] }) {
+export function JoinFlow({ code, uid, inviterName, defaults }: { code: string; uid: string; inviterName: string; defaults: { name: string; handle: string } }) {
   const [step, setStep] = useState<Step>("about");
   const [transcript, setTranscript] = useState("");
   const [card, setCard] = useState({ name: defaults.name, role: "", handle: defaults.handle, bio_md: "" });
@@ -53,7 +53,7 @@ export function JoinFlow({ code, uid, inviterName, defaults, cities }: { code: s
         </div>
       )}
       {step === "card" && (
-        <CardStep code={code} uid={uid} card={card} setCard={setCard} ai={ai} cities={cities} onBack={() => setStep("about")} onJoined={() => setStep("in")} />
+        <CardStep code={code} uid={uid} card={card} setCard={setCard} ai={ai} onBack={() => setStep("about")} onJoined={() => setStep("in")} />
       )}
       {step === "in" && <YoureIn inviterName={inviterName} />}
     </main>
@@ -191,7 +191,6 @@ function CardStep({
   card,
   setCard,
   ai,
-  cities,
   onBack,
   onJoined,
 }: {
@@ -200,7 +199,6 @@ function CardStep({
   card: CardFields;
   setCard: (f: (c: CardFields) => CardFields) => void;
   ai: boolean;
-  cities: City[];
   onBack: () => void;
   onJoined: () => void;
 }) {
@@ -208,7 +206,7 @@ function CardStep({
   const file = useRef<HTMLInputElement>(null);
   const [avatar, setAvatar] = useState<{ path: string; url: string } | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [cityId, setCityId] = useState<number | "">("");
+  const [city, setCity] = useState<City | null>(null);
   const [birth, setBirth] = useState("");
   const [agree, setAgree] = useState(false);
   const [today] = useState(() => new Date().toISOString().slice(0, 10));
@@ -222,7 +220,7 @@ function CardStep({
     !card.name.trim() && ["name", "your name"],
     !card.role.trim() && ["role", "what you do"],
     card.handle.length < 2 && ["handle", "a handle"],
-    !cityId && ["city", "your city"],
+    !city && ["city", "your city"],
     !agree && ["agree", "the agreement tick"],
   ].filter((m): m is [string, string] => Boolean(m));
   const bad = (k: string) => checked && missing.some(([key]) => key === k);
@@ -256,7 +254,7 @@ function CardStep({
     if (missing.length) return;
     startTransition(async () => {
       setError(null);
-      const res = await joinClub({ code, ...card, city_id: Number(cityId), birth_date: birth || null, avatar_path: avatar?.path ?? null, agreed: agree });
+      const res = await joinClub({ code, ...card, city_id: city?.id ?? 0, birth_date: birth || null, avatar_path: avatar?.path ?? null, agreed: agree });
       if ("error" in res) setError(res.error);
       else onJoined();
     });
@@ -322,17 +320,10 @@ function CardStep({
             <input value={card.handle} onChange={(e) => setCard((c) => ({ ...c, handle: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "") }))} maxLength={30} className="w-full bg-transparent px-1 py-3 outline-none" />
           </div>
         </label>
-        <label className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-1.5">
           <span className="meta">city</span>
-          <select value={cityId} onChange={(e) => setCityId(e.target.value ? Number(e.target.value) : "")} className={`${field} ${ring("city")}`} required>
-            <option value="">pick your city</option>
-            {cities.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+          <CityPicker value={city} onChange={setCity} className={`${field} ${ring("city")}`} />
+        </div>
         <label className="flex flex-col gap-1.5">
           <span className="meta">birthday · only you see it</span>
           <input type="date" value={birth} onChange={(e) => setBirth(e.target.value)} max={today} className={field} />
