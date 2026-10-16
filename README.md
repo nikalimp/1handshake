@@ -23,4 +23,4 @@ Database: `supabase/migrations/*.sql` and `supabase/seed.sql`. Setup guide (Russ
 
 ## License
 
-TBD (AGPL-3.0 or MIT).
+[AGPL-3.0](LICENSE). Open code, closed data: anyone can read and run the code; if you run a modified version as a service, you share your changes too. Member data never leaves the club.
