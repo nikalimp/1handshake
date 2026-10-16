@@ -9,6 +9,7 @@ import { QrCode } from "@/components/qr-code";
 import { SadFace } from "@/components/sad-face";
 import { fileToSquareJpeg, squareJpeg } from "@/lib/image";
 import { createClient } from "@/lib/supabase/client";
+import { tidySelfies } from "./actions";
 
 type Invite = {
   id: string;
@@ -52,6 +53,7 @@ export function InviteFlow({ uid }: { uid: string }) {
       setInvite(data);
       setGuest(null);
       setPhase("code");
+      void tidySelfies();
     },
     [supabase],
   );
@@ -351,11 +353,11 @@ function JoinedStep({ guest, onAgain }: { guest: Guest; onAgain: () => void }) {
       <Confetti />
       <div className="flex flex-col items-center gap-4 px-2 pt-16 text-center">
         <Avatar name={guest.name} size={96} met />
-        <h1 className="text-[30px] leading-[34px] font-extrabold tracking-[-0.03em] lowercase">{guest.name} joined the club</h1>
+        <h1 className="text-[30px] leading-[34px] font-extrabold tracking-[-0.03em]">{guest.name} joined the club</h1>
         <p className="text-ink-muted">you&apos;re connected 🤝 your network just grew by one handshake.</p>
         <div className="mt-4 flex w-full flex-col gap-3">
           {guest.handle && (
-            <Link href={`/@${guest.handle}`} className={buttonClass("primary")}>
+            <Link href={`/people/${guest.handle}`} className={buttonClass("primary")}>
               open profile
             </Link>
           )}

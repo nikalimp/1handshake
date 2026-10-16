@@ -2,16 +2,17 @@ import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import type { Card } from "@/lib/data";
 
-export function MemberCard({ person, mutuals }: { person: Card; mutuals: Card[] }) {
+export function MemberCard({ person, mutuals, avatars }: { person: Card; mutuals: Card[]; avatars?: Map<string, string> }) {
+  const src = (c: Card) => (c.avatar_path ? avatars?.get(c.avatar_path) : undefined);
   return (
     <article className="flex flex-col gap-4 rounded-[var(--radius-lg)] bg-surface p-6 shadow-[var(--shadow-card)]">
       <div className="flex items-center gap-4">
-        <Avatar name={person.name} size={72} />
+        <Avatar name={person.name} size={72} src={src(person)} />
         <div className="min-w-0">
-          <h2 className="text-2xl leading-7 font-extrabold tracking-[-0.02em] lowercase">{person.name}</h2>
+          <h2 className="text-2xl leading-7 font-extrabold tracking-[-0.02em]">{person.name}</h2>
           <p className="text-[15px] leading-5 text-ink-muted">{person.role}</p>
           {person.handle && (
-            <Link href={`/@${person.handle}`} className="meta mt-1.5 block">
+            <Link href={`/people/${person.handle}`} className="meta mt-1.5 block">
               @{person.handle} · 2nd
             </Link>
           )}
@@ -22,7 +23,7 @@ export function MemberCard({ person, mutuals }: { person: Card; mutuals: Card[] 
         <span className="flex">
           {mutuals.slice(0, 3).map((m, i) => (
             <span key={m.id} className={i ? "-ml-2" : ""}>
-              <Avatar name={m.name} size={28} />
+              <Avatar name={m.name} size={28} src={src(m)} />
             </span>
           ))}
         </span>

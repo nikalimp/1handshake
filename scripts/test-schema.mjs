@@ -20,6 +20,7 @@ await db.exec(`
 `);
 await db.exec(readFileSync("supabase/migrations/20261016000000_init.sql", "utf8"));
 await db.exec(readFileSync("supabase/migrations/20261016000200_invite_flow.sql", "utf8"));
+await db.exec(readFileSync("supabase/migrations/20261016000300_profile_wall.sql", "utf8"));
 await db.exec(readFileSync("supabase/seed.sql", "utf8"));
 // No broad grants here: the migration's own grants must be enough ("auto-expose tables" off).
 
@@ -92,7 +93,14 @@ await as("nik");
 const myInv = (await sql(`select status, guest_step from invites where id = $1`, [inv.id])).rows[0];
 assert.deepEqual(myInv, { status: "joined", guest_step: "done" });
 assert.equal((await sql(`select is_connected($1,$2) c`, [ids.nik, ids.guest])).rows[0].c, true);
-console.log("✓ invite: create → open (anon) → step → accept → 🤝 connected, code is single-use");
+await asAdmin();
+assert.ok((await sql(`select terms_accepted_at from profiles where id = $1`, [ids.guest])).rows[0].terms_accepted_at, "consent time is stored");
+await as("kate");
+await assert.rejects(sql(`select terms_accepted_at from profiles where id = $1`, [ids.guest]), /permission denied/);
+await as("guest");
+const gw = (await sql(`select kind, other_id, selfie_path from wall($1)`, [ids.guest])).rows;
+assert.deepEqual(gw, [{ kind: "handshake", other_id: ids.nik, selfie_path: "nik/selfie.jpg" }]);
+console.log("✓ invite: create → open (anon) → step → accept → 🤝 connected, code is single-use, consent time stored, joint selfie on the wall");
 
 // expired code
 await as("nik");
@@ -126,7 +134,14 @@ await as("kate");
 await sql(`insert into wall_posts (wall_owner_id, author_id, body) values ($1, auth.uid(), 'great meetup!')`, [ids.nik]);
 await as("david");
 await assert.rejects(sql(`insert into wall_posts (wall_owner_id, author_id, body) values ($1, auth.uid(), 'hi')`, [ids.nik]), /row-level security/);
-console.log("✓ wall: connections can post, strangers cannot");
+await as("david");
+const nw = (await sql(`select kind, body, fires from wall($1) where kind = 'post'`, [ids.nik])).rows;
+assert.deepEqual(nw, [{ kind: "post", body: "great meetup!", fires: 0 }]);
+await sql(`insert into post_fires (post_id, profile_id) select id, auth.uid() from wall_posts where body = 'great meetup!'`);
+assert.equal((await sql(`select fires, fired from wall($1) where kind = 'post'`, [ids.nik])).rows[0].fired, true);
+await as(null, "anon");
+await assert.rejects(sql(`select * from wall($1)`, [ids.nik]), /permission denied/);
+console.log("✓ wall: connections can post, strangers cannot; members see posts with 🔥, anonymous visitors don't");
 
 // 5. Ghost
 await as("kate");

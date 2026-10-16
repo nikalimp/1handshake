@@ -3,6 +3,7 @@ import { buttonClass } from "@/components/button";
 import { MemberCard } from "@/components/member-card";
 import { ScreenTitle } from "@/components/screen-title";
 import { CARD_FIELDS, type Card } from "@/lib/data";
+import { signedUrls } from "@/lib/files";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = { title: "connect" };
@@ -16,6 +17,7 @@ export default async function ConnectPage() {
     ? await supabase.from("profiles").select(CARD_FIELDS).in("id", ids).returns<Card[]>()
     : { data: [] as Card[] };
   const byId = new Map((cards ?? []).map((c) => [c.id, c]));
+  const avatars = await signedUrls(supabase, "avatars", (cards ?? []).map((c) => c.avatar_path));
 
   return (
     <>
@@ -29,7 +31,7 @@ export default async function ConnectPage() {
         {list.map((r) => {
           const person = byId.get(r.person);
           if (!person) return null;
-          return <MemberCard key={r.person} person={person} mutuals={r.mutuals.map((m) => byId.get(m)).filter((m): m is Card => Boolean(m))} />;
+          return <MemberCard key={r.person} person={person} mutuals={r.mutuals.map((m) => byId.get(m)).filter((m): m is Card => Boolean(m))} avatars={avatars} />;
         })}
         {list.length === 0 && (
           <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">

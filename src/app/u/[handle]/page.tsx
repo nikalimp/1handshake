@@ -6,6 +6,8 @@ import { buttonClass } from "@/components/button";
 import { Logo } from "@/components/logo";
 import { Markdown } from "@/components/markdown";
 import { cardToMarkdown, getCardByHandle } from "@/lib/cards";
+import { signedUrls } from "@/lib/files";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export async function generateMetadata(props: PageProps<"/u/[handle]">): Promise<Metadata> {
   const { handle } = await props.params;
@@ -40,8 +42,8 @@ export default async function VisitCard(props: PageProps<"/u/[handle]">) {
         <Logo size={28} />
       </Link>
       <article className="flex flex-col gap-4 rounded-[var(--radius-lg)] border border-line bg-surface p-6">
-        <Avatar name={card.name} size={84} />
-        <h1 className="text-[28px] leading-8 font-extrabold tracking-[-0.02em] lowercase">
+        <Avatar name={card.name} size={84} src={(await signedUrls(createAdminClient(), "avatars", [card.avatar_path])).get(card.avatar_path ?? "")} />
+        <h1 className="text-[28px] leading-8 font-extrabold tracking-[-0.02em]">
           {card.name} <span className="font-semibold text-ink-muted">— {card.role}</span>
         </h1>
         {card.cities?.name && <span className="meta">{card.cities.name}</span>}

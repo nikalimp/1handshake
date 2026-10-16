@@ -35,11 +35,11 @@ export default async function InviteLanding(props: PageProps<"/i/[code]">) {
     return (
       <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-4 px-5 text-center">
         <span className="text-5xl">🤝</span>
-        <h1 className="text-[30px] leading-[34px] font-extrabold tracking-[-0.03em] lowercase">you and {inv?.inviter_name ?? "them"} are connected</h1>
+        <h1 className="text-[30px] leading-[34px] font-extrabold tracking-[-0.03em]">you and {inv?.inviter_name ?? "them"} are connected</h1>
         <p className="text-ink-muted">met in person · just now</p>
         <div className="mt-2 flex w-full flex-col gap-3">
           {inv?.inviter_handle && (
-            <Link href={`/@${inv.inviter_handle}`} className={buttonClass("primary")}>
+            <Link href={`/people/${inv.inviter_handle}`} className={buttonClass("primary")}>
               open their profile
             </Link>
           )}
@@ -70,7 +70,7 @@ export default async function InviteLanding(props: PageProps<"/i/[code]">) {
         )}
       </div>
       <p className="mt-4 flex items-center justify-center gap-2.5 text-[15px]">
-        <Avatar name={inv.inviter_name} size={28} /> invited by <b className="lowercase">{inv.inviter_name}</b>
+        <Avatar name={inv.inviter_name} size={28} /> invited by <b>{inv.inviter_name}</b>
       </p>
       <div className="mt-auto pt-8">
         {signedIn ? (

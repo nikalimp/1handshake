@@ -239,7 +239,10 @@ function CardStep({
       const path = `${uid}/${crypto.randomUUID()}.jpg`;
       const { error } = await supabase.storage.from("avatars").upload(path, blob, { contentType: "image/jpeg" });
       if (error) throw error;
-      if (avatar) URL.revokeObjectURL(avatar.url);
+      if (avatar) {
+        URL.revokeObjectURL(avatar.url);
+        void supabase.storage.from("avatars").remove([avatar.path]);
+      }
       setAvatar({ path, url: URL.createObjectURL(blob) });
     } catch {
       setError("couldn't upload the photo. try another one.");
@@ -294,7 +297,7 @@ function CardStep({
             onChange={set("name")}
             placeholder="your name"
             maxLength={80}
-            className={`rounded-[var(--radius-sm)] bg-surface-sunk px-3 py-2 text-[24px] leading-8 font-extrabold tracking-[-0.02em] lowercase outline-none focus:shadow-[inset_0_0_0_1.5px_var(--line-strong)] ${ring("name")}`}
+            className={`rounded-[var(--radius-sm)] bg-surface-sunk px-3 py-2 text-[24px] leading-8 font-extrabold tracking-[-0.02em] outline-none focus:shadow-[inset_0_0_0_1.5px_var(--line-strong)] ${ring("name")}`}
           />
         </label>
         <label className="flex flex-col gap-1.5">
@@ -304,7 +307,7 @@ function CardStep({
             onChange={set("role")}
             placeholder="e.g. founder, ai notes app"
             maxLength={80}
-            className={`rounded-[var(--radius-sm)] bg-surface-sunk px-3 py-2.5 text-[17px] font-semibold lowercase outline-none placeholder:font-normal placeholder:text-ink-muted focus:shadow-[inset_0_0_0_1.5px_var(--line-strong)] ${ring("role")}`}
+            className={`rounded-[var(--radius-sm)] bg-surface-sunk px-3 py-2.5 text-[17px] font-semibold outline-none placeholder:font-normal placeholder:text-ink-muted focus:shadow-[inset_0_0_0_1.5px_var(--line-strong)] ${ring("role")}`}
           />
         </label>
 
@@ -383,7 +386,7 @@ function CardStep({
 function YoureIn({ inviterName }: { inviterName: string }) {
   const router = useRouter();
   useEffect(() => {
-    const t = setTimeout(() => router.replace("/feed"), 2800);
+    const t = setTimeout(() => router.replace("/profile"), 2800);
     return () => clearTimeout(t);
   }, [router]);
   return (
@@ -393,9 +396,9 @@ function YoureIn({ inviterName }: { inviterName: string }) {
         <span className="text-5xl">🤝</span>
         <h1 className="text-[34px] leading-[38px] font-extrabold tracking-[-0.03em]">you&apos;re in</h1>
         <p className="text-ink-muted">
-          welcome to 1handshake. you and <span className="lowercase">{inviterName.split(" ")[0]}</span> are connected.
+          welcome to 1handshake. you and {inviterName.split(" ")[0]} are connected.
         </p>
-        <p className="meta mt-6">opening your feed…</p>
+        <p className="meta mt-6">opening your profile…</p>
       </section>
     </>
   );

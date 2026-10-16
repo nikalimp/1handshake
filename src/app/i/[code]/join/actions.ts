@@ -59,6 +59,10 @@ export async function joinClub(input: JoinInput): Promise<{ ok: true } | { error
   if (input.avatar_path?.startsWith(`${user.id}/`)) {
     await supabase.from("profiles").update({ avatar_path: input.avatar_path }).eq("id", user.id);
   }
+  // Photos tried and replaced during registration aren't needed anymore.
+  const { data: files } = await supabase.storage.from("avatars").list(user.id, { limit: 100 });
+  const stale = (files ?? []).map((f) => `${user.id}/${f.name}`).filter((p) => p !== input.avatar_path);
+  if (stale.length) await supabase.storage.from("avatars").remove(stale);
   return { ok: true };
 }
 

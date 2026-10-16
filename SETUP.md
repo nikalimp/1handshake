@@ -12,6 +12,7 @@
    - `supabase/migrations/20261016000000_init.sql` — схема, правила доступа, функции;
    - `supabase/migrations/20261016000100_storage.sql` — приватные бакеты для селфи и аватаров;
    - `supabase/migrations/20261016000200_invite_flow.sql` — отмена инвайта и мгновенный 🤝, когда QR сканирует участник;
+   - `supabase/migrations/20261016000300_profile_wall.sql` — время согласия с условиями и стена профиля;
    - `supabase/seed.sql` — сферы и города.
 4. Project Settings → API: скопируй **Project URL**, **publishable key**, **service_role key** (секретный).
 
