@@ -20,12 +20,7 @@ await db.exec(`
 `);
 await db.exec(readFileSync("supabase/migrations/20261016000000_init.sql", "utf8"));
 await db.exec(readFileSync("supabase/seed.sql", "utf8"));
-await db.exec(`grant select, insert, update, delete on all tables in schema public to anon, authenticated;
-  grant usage on all sequences in schema public to authenticated;`);
-// Re-apply column-level restrictions after the broad grant above (Supabase grants table rights by default too).
-await db.exec(`revoke select, update on public.profiles from anon, authenticated;
-  grant select (id, handle, name, role, bio_md, avatar_path, city_id, open_to_hiring, open_to_network, invited_by, status, created_at) on public.profiles to anon, authenticated;
-  grant update (handle, name, role, bio_md, avatar_path, city_id, birth_date, open_to_hiring, open_to_network) on public.profiles to authenticated;`);
+// No broad grants here: the migration's own grants must be enough ("auto-expose tables" off).
 
 const ids = {};
 for (const n of ["nik", "kate", "ivan", "anna", "david", "guest"]) ids[n] = crypto.randomUUID();

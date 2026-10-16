@@ -3,8 +3,11 @@
 Пошаговая настройка для Ника. Порядок важен: Supabase → Google → локальный запуск → Vercel → домен.
 
 ## 1. Supabase (база, вход, файлы)
-1. supabase.com → New project. **Region: Frankfurt (eu-central-1)** — данные участников в ЕС.
-2. Сохрани пароль базы.
+1. supabase.com → New project:
+   - **Region: Europe → Frankfurt (eu-central-1)** — данные участников в ЕС. Регион потом не поменять.
+   - Security: **Enable Data API** — включено; **Automatically expose new tables** — выключено (миграция сама выдаёт права на нужные таблицы и колонки); **Enable automatic RLS** — включено (страховка для будущих таблиц).
+   - Postgres Type: обычный Postgres (не OrioleDB).
+2. Сохрани пароль базы в менеджер паролей.
 3. SQL Editor → выполни по очереди:
    - `supabase/migrations/20261016000000_init.sql` — схема, правила доступа, функции;
    - `supabase/migrations/20261016000100_storage.sql` — приватные бакеты для селфи и аватаров;

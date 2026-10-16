@@ -452,6 +452,28 @@ create policy "own hidden list" on public.hidden for all
 create policy "members file reports" on public.reports for insert to authenticated with check (reporter_id = auth.uid());
 
 -- ---------------------------------------------------------------------------
+-- Table access for the Data API roles. Explicit on purpose: works whether or not
+-- "Automatically expose new tables" is enabled in the Supabase project.
+-- RLS policies above decide which rows; these grants decide which tables and columns.
+-- ---------------------------------------------------------------------------
+grant usage on schema public to anon, authenticated;
+revoke all on all tables in schema public from anon, authenticated;
+
+grant select on public.cities, public.spheres to anon, authenticated;
+grant select (id, handle, name, role, bio_md, avatar_path, city_id, open_to_hiring, open_to_network,
+              invited_by, status, created_at) on public.profiles to anon, authenticated;
+grant update (handle, name, role, bio_md, avatar_path, city_id, birth_date, open_to_hiring, open_to_network)
+  on public.profiles to authenticated;
+grant select on public.profile_spheres to anon, authenticated;
+grant insert, update, delete on public.profile_spheres to authenticated;
+grant select on public.invites, public.intro_requests, public.request_mutuals, public.connections to authenticated;
+grant select, insert, update, delete on public.needs_offers to authenticated;
+grant select, insert, update on public.wall_posts to authenticated;
+grant select, insert, delete on public.post_fires to authenticated;
+grant select, insert, delete on public.hidden to authenticated;
+grant insert on public.reports to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- Function access
 -- ---------------------------------------------------------------------------
 revoke execute on function public.create_invite(text), public.accept_invite(text, text, text, text, text, int, date),
@@ -463,6 +485,7 @@ grant execute on function public.create_invite(text), public.accept_invite(text,
   public.back_request(uuid, boolean), public.respond_request(uuid, boolean), public.incoming_requests(),
   public.become_ghost() to authenticated;
 grant execute on function public.open_invite(text), public.set_guest_step(text, public.guest_step) to anon, authenticated;
+grant execute on function public.is_connected(uuid, uuid) to authenticated;
 
 -- Realtime for the inviter's waiting screen (Supabase only).
 do $$
