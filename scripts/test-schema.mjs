@@ -377,4 +377,90 @@ await asAdmin();
 assert.equal((await sql(`select count(*)::int c from offers where profile_id = $1`, [ids.anna])).rows[0].c, 0, "a ghost has no offers");
 console.log("✓ offers: needs → orders, public, interest seen by the author only, in the feed, 10 open at most, ghost");
 
+// 14. Admin panel, stage 1: activity, stats, members, member card, ban, hide post, close offer — admins only
+await asAdmin();
+await db.exec(readFileSync("supabase/migrations/20261017000200_admin.sql", "utf8"));
+await as("david");
+await sql(`insert into wall_posts (wall_owner_id, author_id, body) values (auth.uid(), auth.uid(), 'shipping today')`);
+await sql(`select touch_activity()`);
+await sql(`select touch_activity()`); // the same day counts once
+await assert.rejects(sql(`select last_seen_at from profiles where id = auth.uid()`), /permission denied/, "members don't see last_seen_at");
+await assert.rejects(sql(`select * from activity_days`), /permission denied/);
+await assert.rejects(sql(`select * from admin_actions`), /permission denied/);
+const adminCalls = [
+  [`select admin_badges()`, []],
+  [`select admin_stats(null, null)`, []],
+  [`select * from admin_timeseries(null, null)`, []],
+  [`select * from admin_retention(12)`, []],
+  [`select * from admin_members()`, []],
+  [`select admin_member($1)`, [ids.nik]],
+  [`select admin_set_ban($1, true, 'spam')`, [ids.david]],
+  [`select admin_hide_post(gen_random_uuid(), null)`, []],
+  [`select admin_close_offer(gen_random_uuid(), null)`, []],
+];
+for (const [q, p] of adminCalls) await assert.rejects(sql(q, p), /admins only/, `non-admin refused: ${q}`);
+await as(null, "anon");
+await assert.rejects(sql(`select admin_stats(null, null)`), /permission denied/);
+await assert.rejects(sql(`select touch_activity()`), /permission denied/);
+await assert.rejects(sql(`select joined_at_event($1)`, [ids.nik]), /permission denied/, "internal helpers are closed");
+await as("ivan");
+await assert.rejects(sql(`select admin_log_action('x', 'profile', 'y')`), /permission denied/);
+
+await asAdmin();
+const truth = (await sql(`select (select count(*)::int from profiles where status = 'ghost') ghosts,
+  (select count(*)::int from invites where status = 'joined') joined_codes,
+  (select count(*)::int from push_subscriptions) devices`)).rows[0];
+await as("nik");
+const st = (await sql(`select admin_stats(null, null) s`)).rows[0].s;
+assert.equal(st.north_star.accepted, 1, "nik → anna intro accepted");
+assert.equal(st.members.ghost, truth.ghosts);
+assert.equal(st.funnel.member_handshakes, truth.joined_codes - 1, "used codes minus the one guest joined with");
+assert.equal(st.funnel.joined, 1, "guest joined through nik's selfie");
+assert.equal(st.activity.dau, 1);
+assert.equal(st.network.tree_depth, 2);
+assert.equal(st.events.connections, 2);
+assert.equal(st.push.devices, truth.devices);
+const ts = (await sql(`select metric, sum(value)::int n from admin_timeseries(null, null) group by metric`)).rows;
+assert.equal(ts.find((r) => r.metric === "invites_joined").n, 1);
+assert.equal(ts.find((r) => r.metric === "active_members").n, 1);
+assert.ok((await sql(`select * from admin_retention(12)`)).rows.length > 0);
+const all = (await sql(`select * from admin_members()`)).rows;
+assert.equal(all.length, 6);
+assert.equal(Number(all[0].total), 6);
+assert.ok(!("birth_date" in all[0]), "no birth dates in the admin");
+assert.deepEqual((await sql(`select handle, join_method, inviter_name from admin_members('gue')`)).rows, [{ handle: "guest", join_method: "selfie", inviter_name: "nik" }]);
+assert.equal((await sql(`select count(*)::int c from admin_members(p_join => 'founder')`)).rows[0].c, 5);
+assert.equal((await sql(`select count(*)::int c from admin_members('100%_')`)).rows[0].c, 0, "search wildcards are escaped");
+const card = (await sql(`select admin_member($1) m`, [ids.guest])).rows[0].m;
+assert.equal(card.join.method, "selfie");
+assert.equal(card.ancestors[0].id, ids.nik);
+assert.ok(card.connections.list.some((c) => c.id === ids.nik));
+assert.ok(!("birth_date" in card.profile));
+await sql(`select admin_member($1)`, [ids.guest]);
+await asAdmin();
+assert.equal((await sql(`select count(*)::int c from admin_actions where action = 'view_member' and target_id = $1`, [ids.guest])).rows[0].c, 1, "a view is logged once per 10 minutes");
+
+await as("nik");
+await assert.rejects(sql(`select admin_set_ban($1, true, '')`, [ids.david]), /reason required/);
+await assert.rejects(sql(`select admin_set_ban($1, true, 'x')`, [ids.nik]), /not yourself/);
+await assert.rejects(sql(`select admin_set_ban($1, true, 'x')`, [ids.kate]), /nothing to change/, "a ghost can't be banned");
+assert.equal((await sql(`select admin_set_ban($1, true, 'spam in intros') s`, [ids.david])).rows[0].s, "banned");
+await as(null, "anon");
+assert.equal((await sql(`select count(*)::int c from profiles where id = $1`, [ids.david])).rows[0].c, 0, "a banned card disappears");
+await as("nik");
+assert.equal((await sql(`select admin_set_ban($1, false, null) s`, [ids.david])).rows[0].s, "active");
+const acts = (await sql(`select admin_member($1) m`, [ids.david])).rows[0].m.actions;
+assert.deepEqual(acts.map((a) => [a.action, a.reason]), [["unban", null], ["ban", "spam in intros"]]);
+
+const post = (await sql(`select id from wall_posts where body = 'shipping today'`)).rows[0];
+await sql(`select admin_hide_post($1, 'off-topic')`, [post.id]);
+assert.equal((await sql(`select count(*)::int c from wall($1) where kind = 'post' and id = $2`, [ids.david, post.id])).rows[0].c, 0, "a hidden post leaves the wall");
+await assert.rejects(sql(`select admin_hide_post($1, null)`, [post.id]), /post not found/);
+const order = (await sql(`select id from offers where profile_id = $1 and closed_at is null`, [ids.nik])).rows[0];
+await sql(`select admin_close_offer($1, 'duplicate')`, [order.id]);
+assert.ok((await sql(`select closed_at from offers where id = $1`, [order.id])).rows[0].closed_at);
+const badges = (await sql(`select * from admin_badges()`)).rows[0];
+assert.equal(typeof Number(badges.events), "number");
+console.log("✓ admin: activity, stats, members, card (view logged), ban/unban with reason, hide post, close offer; members and anonymous refused");
+
 console.log("\nall schema checks passed");

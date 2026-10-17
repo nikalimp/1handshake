@@ -12,6 +12,9 @@ const cardUrl = (process.env.NEXT_PUBLIC_CARD_URL ?? "").replace(/\/$/, "");
 const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "");
 const mainUrl = (process.env.NEXT_PUBLIC_MAIN_URL ?? "https://1handshake.com").replace(/\/$/, "");
 const cardsOnMainSite = Boolean(cardUrl) && cardUrl !== appUrl;
+// The admin panel's own domain (admin.1handshake.com), when set. Its robots.txt closes it to search engines.
+const adminHost = (process.env.NEXT_PUBLIC_ADMIN_URL ?? "").replace(/^https?:\/\//, "").replace(/[/].*$/, "").replace(/:\d+$/, "");
+const onAdmin = adminHost ? [{ type: "host" as const, value: adminHost }] : undefined;
 
 const nextConfig: NextConfig = {
   assetPrefix,
@@ -41,15 +44,25 @@ const nextConfig: NextConfig = {
   },
   // Public visit cards: /@handle (and /@handle/llms.txt) are served by /u/:handle; public event pages /e/:slug by /ev/:slug.
   async rewrites() {
-    return [
-      { source: "/@:handle/llms.txt", destination: "/u/:handle/llms.txt" },
-      { source: "/@:handle", destination: "/u/:handle" },
-      { source: "/e/:slug", destination: "/ev/:slug" },
-    ];
+    return {
+      // The proxy skips .txt files, so the admin domain's robots.txt is mapped here.
+      beforeFiles: onAdmin ? [{ source: "/robots.txt", has: onAdmin, destination: "/admin/robots.txt" }] : [],
+      afterFiles: [
+        { source: "/@:handle/llms.txt", destination: "/u/:handle/llms.txt" },
+        { source: "/@:handle", destination: "/u/:handle" },
+        { source: "/e/:slug", destination: "/ev/:slug" },
+      ],
+      fallback: [],
+    };
   },
   // Fonts and scripts requested from 1handshake.com need CORS.
   async headers() {
-    return [{ source: "/_next/static/:path*", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] }];
+    return [
+      { source: "/_next/static/:path*", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] },
+      // The admin panel is never indexed, on its own domain or at /admin.
+      { source: "/admin/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
+      ...(onAdmin ? [{ source: "/:path*", has: onAdmin, headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] }] : []),
+    ];
   },
   images: {
     remotePatterns: [{ protocol: "https", hostname: "*.supabase.co" }],

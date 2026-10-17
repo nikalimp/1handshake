@@ -1,15 +1,15 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { Avatar } from "@/components/avatar";
 import { ScreenTitle } from "@/components/screen-title";
 import { ReviewButtons } from "@/components/event-controls";
-import { CARD_FIELDS, type Card, requireMe } from "@/lib/data";
+import { requireAdmin, adminBase } from "@/lib/admin";
+import { CARD_FIELDS, type Card } from "@/lib/data";
+import { APP_URL } from "@/lib/env";
 import { coverUrl, EVENT_FIELDS, type EventRow, formatWhen } from "@/lib/event-format";
 import { signedUrls } from "@/lib/files";
-import { createClient } from "@/lib/supabase/server";
 import { Decision } from "./decision";
 
-export const metadata = { title: "moderation", robots: { index: false } };
+export const metadata = { title: "moderation" };
 
 type Flag = { invite_id: string; inviter_id: string; guest_id: string; selfie_path: string | null; met_at: string; reports: number; reasons: string[]; flagged_at: string | null };
 
@@ -17,10 +17,8 @@ const day = new Intl.DateTimeFormat("en", { day: "numeric", month: "short", year
 
 // Admin queue: reported handshakes. 3 reports hide the selfie; an admin keeps it or cancels the connection.
 export default async function AdminPage() {
-  await requireMe();
-  const supabase = await createClient();
-  const { data: admin } = await supabase.rpc("is_admin");
-  if (admin !== true) notFound();
+  const { supabase } = await requireAdmin();
+  const base = await adminBase();
 
   const [{ data }, { data: pendingEvents }] = await Promise.all([
     supabase.rpc("admin_flags"),
@@ -48,7 +46,7 @@ export default async function AdminPage() {
             const cover = coverUrl(e.cover_path);
             return (
               <article key={e.id} className="flex flex-col gap-3 rounded-[var(--radius-lg)] bg-surface p-4 shadow-[var(--shadow-card)]">
-                <Link href={`/events/${e.slug}`} className="flex gap-3">
+                <a href={`${APP_URL}/events/${e.slug}`} className="flex gap-3">
                   {cover ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={cover} alt="" className="h-16 w-16 shrink-0 rounded-[var(--radius-md)] object-cover" />
@@ -60,7 +58,7 @@ export default async function AdminPage() {
                     <span className="meta block">{formatWhen(e)}</span>
                     <span className="block text-sm text-ink-muted">by {host?.name ?? "a member"}</span>
                   </span>
-                </Link>
+                </a>
                 <ReviewButtons eventId={e.id} />
               </article>
             );
@@ -96,7 +94,7 @@ export default async function AdminPage() {
                         <span key={i}>
                           {i > 0 && " & "}
                           {p?.handle ? (
-                            <Link href={`/people/${p.handle}`} className="hover:underline">
+                            <Link href={`${base}/members?m=${p.id}`} className="hover:underline">
                               {p.name}
                             </Link>
                           ) : (

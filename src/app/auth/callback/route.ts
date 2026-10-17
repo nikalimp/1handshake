@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { requestOrigin } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 
 // Google sends the member back here. We exchange the code for a session, then:
@@ -7,7 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 // - existing member → their `next` page;
 // - signed in but not a member → back to the landing page with a note.
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = request.nextUrl;
+  const { searchParams } = request.nextUrl;
+  const origin = requestOrigin(request);
   const code = searchParams.get("code");
   const nextParam = searchParams.get("next") ?? "/connect";
   const next = nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/connect";

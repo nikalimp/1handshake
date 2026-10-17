@@ -10,7 +10,7 @@ export async function resolveHandshake(inviteId: string, cancel: boolean): Promi
   const supabase = await createClient();
   const { error } = await supabase.rpc("admin_resolve_handshake", { p_invite: inviteId, p_cancel: cancel });
   if (error) return { error: error.message.includes("admins only") ? "admins only" : "couldn't save. try again." };
-  revalidatePath("/admin");
+  revalidatePath("/admin", "layout");
   revalidatePath("/feed");
   revalidatePath("/graph");
   return { ok: true };

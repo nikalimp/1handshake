@@ -4,7 +4,7 @@ import type { City } from "@/components/city-picker";
 import { PushCard } from "@/components/push-card";
 import { ThemeSwitch } from "@/components/theme-switch";
 import { requireMe } from "@/lib/data";
-import { PRIVACY_URL, TERMS_URL } from "@/lib/env";
+import { PRIVACY_URL, TERMS_URL, ADMIN_URL } from "@/lib/env";
 import { signedUrls } from "@/lib/files";
 import { hasGemini } from "@/lib/gemini";
 import { guessCity } from "@/lib/geo";
@@ -54,9 +54,9 @@ export default async function EditProfilePage() {
       </section>
       <div className="mt-10 flex flex-col items-center gap-3 border-t border-line pt-6">
         {admin === true && (
-          <Link href="/admin" className={buttonClass("ghost", "sm")}>
-            moderation
-          </Link>
+          <a href={ADMIN_URL} className={buttonClass("ghost", "sm")}>
+            admin panel ↗
+          </a>
         )}
         <div className="flex gap-4">
           <a href="/profile/export" className="meta hover:text-ink">
