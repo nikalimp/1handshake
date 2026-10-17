@@ -9,15 +9,19 @@ type Item = { href: string; label: string; badge?: number; icon: ReactNode };
 const icons = {
   overview: <><path d="M4 19V10M10 19V5M16 19v-7M21 19H3" /></>,
   members: <><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19c1-3 3.2-4.5 5.5-4.5s4.5 1.5 5.5 4.5" /><path d="M16 5.5a3 3 0 0 1 0 5.6M18.5 19c-.4-1.6-1.1-2.8-2.1-3.6" /></>,
+  events: <><rect x="4" y="5" width="16" height="15" rx="3" /><path d="M8 3v4M16 3v4M4 10h16" /></>,
+  offers: <><path d="M4 7h16v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" /><path d="M9 7V5a3 3 0 0 1 6 0v2" /></>,
   moderation: <><path d="M12 3 5 6v5c0 4.4 3 8.2 7 10 4-1.8 7-5.6 7-10V6z" /><path d="m9 12 2 2 4-4" /></>,
 };
 
 /** Sidebar on desktop, a row of tabs on the phone. `base` is "" on the admin domain and "/admin" elsewhere. */
-export function AdminNav({ base, badges, me, appUrl }: { base: string; badges: { moderation: number }; me: { name: string | null }; appUrl: string }) {
+export function AdminNav({ base, badges, me, appUrl }: { base: string; badges: { events: number; offers: number; moderation: number }; me: { name: string | null }; appUrl: string }) {
   const path = usePathname();
   const items: Item[] = [
     { href: base || "/", label: "overview", icon: icons.overview },
     { href: `${base}/members`, label: "members", icon: icons.members },
+    { href: `${base}/events`, label: "events", badge: badges.events, icon: icons.events },
+    { href: `${base}/offers`, label: "offers", badge: badges.offers, icon: icons.offers },
     { href: `${base}/moderation`, label: "moderation", badge: badges.moderation, icon: icons.moderation },
   ];
   // usePathname shows the address bar path: "/members" on the admin domain, "/admin/members" on localhost.

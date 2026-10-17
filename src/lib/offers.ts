@@ -19,6 +19,10 @@ export type Offer = {
   link: string | null;
   closed_at: string | null;
   created_at: string;
+  /** Hidden by a moderator (with a reason) or by three reports (flagged): only the author and admins see it. */
+  hidden_at?: string | null;
+  hidden_reason?: string | null;
+  flagged_at?: string | null;
 };
-export const OFFER_FIELDS = "id, profile_id, kind, title, body_md, price, link, closed_at, created_at";
+export const OFFER_FIELDS = "id, profile_id, kind, title, body_md, price, link, closed_at, created_at, hidden_at, hidden_reason, flagged_at";
 export const MAX_OPEN_OFFERS = 10;

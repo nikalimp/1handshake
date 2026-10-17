@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Avatar } from "@/components/avatar";
+import { DismissMemberReports } from "@/components/admin/admin-controls";
 import { BanControl, CloseOfferButton, HidePostButton, PanelShell } from "@/components/admin/member-actions";
 import { Markdown } from "@/components/markdown";
 import { requireAdmin } from "@/lib/admin";
@@ -10,7 +11,7 @@ import { signedUrls } from "@/lib/files";
 
 type Status = "active" | "ghost" | "banned";
 type Person = { id: string; handle: string | null; name: string | null; avatar_path?: string | null; status?: Status };
-type Report = { id: string; reason: string; created_at: string; resolved_at: string | null; about: "handshake" | "post" | "member"; reporter?: Person };
+type Report = { id: string; reason: string; created_at: string; resolved_at: string | null; about: "handshake" | "post" | "member" | "offer"; reporter?: Person };
 
 type MemberCard = {
   profile: Person & {
@@ -40,7 +41,7 @@ type MemberCard = {
     hosted: { id: string; slug: string; title: string; starts_at: string; review: string; cancelled_at: string | null }[];
     attended: { id: string; slug: string; title: string; starts_at: string; going_at: string | null; checked_in_at: string | null }[];
   };
-  offers: { id: string; kind: string; title: string; price: string | null; closed_at: string | null; created_at: string; interest: number }[];
+  offers: { id: string; kind: string; title: string; price: string | null; closed_at: string | null; created_at: string; interest: number; hidden_at: string | null; hidden_reason: string | null; flagged_at: string | null }[];
   posts: { id: string; body: string; created_at: string; fires: number; wall_owner: Person }[];
   reports_against: Report[];
   reports_by: Report[];
@@ -56,7 +57,18 @@ export function StatusChip({ status }: { status: Status }) {
 }
 
 const JOIN = { founder: "founding member", selfie: "🤝 joined with a selfie", event: "🎟 joined with a selfie at an event" } as const;
-const ACTION = { ban: "banned", unban: "unbanned", hide_post: "post hidden", close_offer: "offer closed" } as Record<string, string>;
+const ACTION = {
+  ban: "banned",
+  unban: "unbanned",
+  hide_post: "post hidden",
+  close_offer: "offer closed",
+  hide_offer: "offer hidden",
+  keep_offer: "offer kept",
+  delete_offer: "offer deleted",
+  resolve_member_reports: "reports dismissed",
+  cancel_handshake: "handshake cancelled",
+  keep_handshake: "handshake kept",
+} as Record<string, string>;
 
 /** The member card in the side panel. Opening it is logged in the database (admin_member). */
 export async function MemberPanel({ id, base, closeHref }: { id: string; base: string; closeHref: string }) {
@@ -214,6 +226,11 @@ export async function MemberPanel({ id, base, closeHref }: { id: string; base: s
         </Section>
 
         <Section title="offers">
+          {c.offers.length > 0 && (
+            <Link href={`${base}/offers?author=${p.id}`} className="meta w-fit hover:text-ink">
+              manage in offers →
+            </Link>
+          )}
           {c.offers.length === 0 && <p className="meta">none</p>}
           <ul className="flex flex-col gap-2">
             {c.offers.map((o) => (
@@ -222,10 +239,11 @@ export async function MemberPanel({ id, base, closeHref }: { id: string; base: s
                   <span className="font-semibold">{o.title}</span>
                   <span className="meta block">
                     {o.kind}
-                    {o.price ? ` · ${o.price}` : ""} · {o.interest} interested · {o.closed_at ? `closed ${fmtDay(o.closed_at)}` : "open"}
+                    {o.price ? ` · ${o.price}` : ""} · {o.interest} interested ·{" "}
+                    {o.hidden_at ? `hidden: ${o.hidden_reason ?? "by admins"}` : o.flagged_at ? "hidden by reports" : o.closed_at ? `closed ${fmtDay(o.closed_at)}` : "open"}
                   </span>
                 </span>
-                {!o.closed_at && <CloseOfferButton id={o.id} />}
+                {!o.closed_at && !o.hidden_at && <CloseOfferButton id={o.id} />}
               </li>
             ))}
           </ul>
@@ -250,6 +268,11 @@ export async function MemberPanel({ id, base, closeHref }: { id: string; base: s
 
         <Section title={`reports about them · ${c.reports_against.length}`}>
           <Reports rows={c.reports_against} base={base} />
+          {c.reports_against.some((r) => r.about === "member" && !r.resolved_at) && (
+            <div className="flex">
+              <DismissMemberReports id={p.id} />
+            </div>
+          )}
         </Section>
         <Section title={`reports they filed · ${c.reports_by.length}`}>
           <Reports rows={c.reports_by} base={base} />

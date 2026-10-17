@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { Markdown } from "@/components/markdown";
+import { ReportOffer } from "@/components/moderation";
 import { InterestButton, OfferOwnerControls } from "@/components/offer-controls";
 import { kindLabel, type Offer } from "@/lib/offers";
 
@@ -12,12 +13,19 @@ export type Interested = { id: string; name: string | null; handle: string | nul
  */
 export function OfferCard({ offer, viewer, count = 0, mine = false, interested = [], clamp = false }: { offer: Offer; viewer: "owner" | "member" | "guest"; count?: number; mine?: boolean; interested?: Interested[]; clamp?: boolean }) {
   const closed = Boolean(offer.closed_at);
+  const hidden = Boolean(offer.hidden_at || offer.flagged_at);
   return (
     <article className={`flex flex-col gap-2.5 rounded-[var(--radius-md)] border border-line bg-surface p-4 ${closed ? "opacity-60" : ""}`}>
       <div className="flex items-center justify-between gap-2">
         <span className="meta rounded-full bg-surface-sunk px-2.5 py-1 text-ink">{kindLabel(offer.kind)}</span>
         <span className="meta">{closed ? "closed" : offer.price}</span>
       </div>
+      {hidden && (
+        <p className="rounded-[var(--radius-sm)] bg-fire-soft px-3 py-2 text-sm text-fire-ink">
+          {offer.hidden_at ? `hidden by moderators${offer.hidden_reason ? `: ${offer.hidden_reason}` : ""}` : "hidden after reports. a moderator will check it soon."}
+          {viewer === "owner" && " only you can see it."}
+        </p>
+      )}
       <h3 className="text-[17px] leading-6 font-bold">{offer.title}</h3>
       {offer.body_md && <div className={clamp ? "line-clamp-4" : ""}><Markdown source={offer.body_md} /></div>}
       {offer.link && (
@@ -25,9 +33,10 @@ export function OfferCard({ offer, viewer, count = 0, mine = false, interested =
           {offer.link.replace(/^https:\/\/(www\.)?/, "")} ↗
         </a>
       )}
-      {viewer === "member" && !closed && (
-        <div>
+      {viewer === "member" && !closed && !hidden && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <InterestButton offerId={offer.id} interested={mine} count={count} />
+          <ReportOffer offerId={offer.id} />
         </div>
       )}
       {viewer === "guest" && !closed && count > 0 && <p className="meta">{count} interested</p>}

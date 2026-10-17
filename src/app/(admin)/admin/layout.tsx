@@ -49,13 +49,14 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     );
   }
 
-  const { data: badges } = await state.supabase.rpc("admin_badges").maybeSingle<{ events: number; reports: number }>();
-  const waiting = Number(badges?.events ?? 0) + Number(badges?.reports ?? 0);
+  const { data: badges } = await state.supabase.rpc("admin_badges").maybeSingle<{ events: number; reports: number; offers: number }>();
+  const events = Number(badges?.events ?? 0);
+  const waiting = events + Number(badges?.reports ?? 0);
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[232px_minmax(0,1fr)]">
       <style>{SERIES_CSS}</style>
-      <AdminNav base={base} badges={{ moderation: waiting }} me={{ name: state.me.name }} appUrl={APP_URL} />
+      <AdminNav base={base} badges={{ events, offers: Number(badges?.offers ?? 0), moderation: waiting }} me={{ name: state.me.name }} appUrl={APP_URL} />
       <main className="mx-auto w-full max-w-[1120px] px-4 pt-2 pb-16 md:px-10 md:pt-6">{children}</main>
     </div>
   );

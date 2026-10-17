@@ -4,7 +4,7 @@ import { WeeklyBars } from "@/components/admin/charts";
 import { adminBase, PERIODS, periodRange, requireAdmin } from "@/lib/admin";
 import { type AdminStats, type RetentionRow, type TimeRow, compact, pct, seriesOf, weekLabel, weekRange } from "@/lib/admin-stats";
 
-export const metadata = { title: "overview" };
+export const metadata = { title: { absolute: "overview · 1handshake admin" } };
 
 const OFFER_KINDS = ["order", "project", "product", "service"] as const;
 

@@ -53,6 +53,28 @@ export async function reportHandshake(inviteId: string): Promise<{ ok: true; rep
   return { ok: true, reports: Number(data) };
 }
 
+// Report someone else's offer: three reports from different members hide it until an admin decides.
+export async function reportOffer(offerId: string, reason: string): Promise<{ ok: true } | { error: string }> {
+  const me = await getMe();
+  if (!me) return { error: "members only" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("report_offer", { p_offer: offerId, p_reason: reason.trim() || "inappropriate offer" });
+  if (error) return { error: "couldn't send the report. try again." };
+  revalidatePath("/feed");
+  return { ok: true };
+}
+
+// Report a member: goes to the moderators' queue, nothing is hidden automatically.
+export async function reportMember(profileId: string, reason: string): Promise<{ ok: true } | { error: string }> {
+  const me = await getMe();
+  if (!me) return { error: "members only" };
+  if (!reason.trim()) return { error: "say what happened" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("report_member", { p_profile: profileId, p_reason: reason.trim().slice(0, 1000) });
+  if (error) return { error: "couldn't send the report. try again." };
+  return { ok: true };
+}
+
 // Either of the two people can remove their connection.
 export async function removeConnection(otherId: string) {
   const me = await getMe();

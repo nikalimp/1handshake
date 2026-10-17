@@ -4,8 +4,8 @@ import { ADMIN_HOST, ADMIN_ON_OWN_HOST, ADMIN_URL, APP_HOST, SUPABASE_KEY, SUPAB
 
 // /admin is not here: the panel shows its own sign-in screen.
 const MEMBER_AREA = ["/connect", "/feed", "/graph", "/profile", "/invite", "/people", "/events"];
-// App screens that never open on the admin domain. /events and /graph are not here: the panel has its own.
-const APP_ONLY = ["/connect", "/feed", "/profile", "/invite", "/people", "/offers", "/i", "/in", "/u", "/ev", "/e"];
+// App screens that never open on the admin domain. /events, /offers and /graph are not here: the panel has its own.
+const APP_ONLY = ["/connect", "/feed", "/profile", "/invite", "/people", "/i", "/in", "/u", "/ev", "/e"];
 // Paths that work the same on the admin domain: sign-in round trip, APIs, Next internals.
 const SHARED = ["/auth/", "/api/", "/_next/", "/favicon.ico"];
 // Once a day per device we mark the member as active (DAU / WAU / MAU, retention).

@@ -463,4 +463,118 @@ const badges = (await sql(`select * from admin_badges()`)).rows[0];
 assert.equal(typeof Number(badges.events), "number");
 console.log("✓ admin: activity, stats, members, card (view logged), ban/unban with reason, hide post, close offer; members and anonymous refused");
 
+// 15. Admin panel, stage 2: reports on offers and members, hidden offers, events, queue, log
+await asAdmin();
+await db.exec(readFileSync("supabase/migrations/20261017000300_admin_moderation.sql", "utf8"));
+ids.mia = crypto.randomUUID();
+await sql(`insert into profiles (id, handle, name, role, city_id) values ($1, 'mia', 'mia', 'member', $2)`, [ids.mia, tb]);
+await as("david");
+const o1 = (await sql(`insert into offers (profile_id, kind, title) values (auth.uid(), 'service', 'Logo design in a day') returning id`)).rows[0].id;
+assert.equal((await sql(`select count(*)::int c from feed() where kind = 'offer' and id = $1`, [o1])).rows[0].c, 1);
+await as("guest");
+const o2 = (await sql(`insert into offers (profile_id, kind, title) values (auth.uid(), 'product', 'Guest product') returning id`)).rows[0].id;
+await assert.rejects(sql(`select report_offer($1)`, [o2]), /offer not found/, "not your own offer");
+assert.equal((await sql(`select report_offer($1, 'scam') n`, [o1])).rows[0].n, 1);
+await as("nik");
+assert.equal((await sql(`select report_offer($1) n`, [o1])).rows[0].n, 2);
+await as(null, "anon");
+await assert.rejects(sql(`select report_offer($1)`, [o1]), /permission denied/);
+assert.equal((await sql(`select count(*)::int c from offers where id = $1`, [o1])).rows[0].c, 1, "two reports don't hide it");
+await as("mia");
+assert.equal((await sql(`select report_offer($1) n`, [o1])).rows[0].n, 3);
+await as(null, "anon");
+assert.equal((await sql(`select count(*)::int c from offers where id = $1`, [o1])).rows[0].c, 0, "three reports hide it");
+await as("guest");
+assert.equal((await sql(`select count(*)::int c from offers where id = $1`, [o1])).rows[0].c, 0);
+await assert.rejects(sql(`insert into offer_interest (offer_id, profile_id) values ($1, auth.uid())`, [o1]), /row-level security/);
+await as("david");
+assert.equal((await sql(`select count(*)::int c from offers where id = $1`, [o1])).rows[0].c, 1, "the author still sees it");
+assert.equal((await sql(`select count(*)::int c from feed() where kind = 'offer' and id = $1`, [o1])).rows[0].c, 0, "and it leaves the feed");
+await assert.rejects(sql(`select report_member($1, 'spam')`, [ids.david]), /not yourself/);
+await as("guest");
+await assert.rejects(sql(`select report_member($1, ' ')`, [ids.david]), /reason required/);
+await sql(`select report_member($1, 'sends spam intros')`, [ids.david]);
+await sql(`select report_member($1, 'sends spam intros')`, [ids.david]); // once while open
+const pend = (await sql(`select * from save_event(null, $1)`, [JSON.stringify({ title: "Guest meetup", starts_local: "2030-02-01T19:00", timezone: "UTC" })])).rows[0];
+
+const stage2 = [
+  [`select * from admin_badges()`, []],
+  [`select admin_review_event($1, true, null)`, [pend.id]],
+  [`select admin_cancel_event($1, 'x')`, [pend.id]],
+  [`select admin_new_checkin_code($1)`, [pend.id]],
+  [`select * from admin_events()`, []],
+  [`select admin_event($1)`, [pend.id]],
+  [`select * from admin_offers()`, []],
+  [`select admin_hide_offer($1, 'x')`, [o1]],
+  [`select admin_unhide_offer($1, null)`, [o1]],
+  [`select admin_delete_offer($1, 'x')`, [o1]],
+  [`select admin_resolve_member_reports($1, null)`, [ids.david]],
+  [`select * from admin_queue()`, []],
+  [`select * from admin_log()`, []],
+  [`select review_event($1, true)`, [pend.id]],
+  [`select * from admin_people($1)`, [[ids.nik]]],
+];
+for (const [q, p] of stage2) await assert.rejects(sql(q, p), /admins only/, `non-admin refused: ${q}`);
+
+await as("nik");
+let queue = (await sql(`select kind, target_id, reports from admin_queue()`)).rows;
+assert.ok(queue.some((r) => r.kind === "offer" && r.target_id === o1 && Number(r.reports) === 3));
+assert.ok(queue.some((r) => r.kind === "member" && r.target_id === ids.david && Number(r.reports) === 1));
+assert.ok(queue.some((r) => r.kind === "event" && r.target_id === pend.id));
+const sinces = (await sql(`select since from admin_queue()`)).rows.map((r) => new Date(r.since).getTime());
+assert.deepEqual(sinces, [...sinces].sort((a, b) => a - b), "oldest first");
+const b2 = (await sql(`select * from admin_badges()`)).rows[0];
+assert.equal(Number(b2.offers), 1);
+assert.ok(Number(b2.events) >= 1 && Number(b2.reports) >= 2);
+assert.equal((await sql(`select count(*)::int c from admin_offers(p_status => 'flagged')`)).rows[0].c, 1);
+const dcard = (await sql(`select admin_member($1) m`, [ids.david])).rows[0].m;
+assert.deepEqual(dcard.reports_against.map((r) => r.about).sort(), ["member", "offer", "offer", "offer"]);
+
+await sql(`select admin_unhide_offer($1, 'looks fine')`, [o1]);
+await as(null, "anon");
+assert.equal((await sql(`select count(*)::int c from offers where id = $1`, [o1])).rows[0].c, 1, "kept: visible again");
+await as("nik");
+assert.equal((await sql(`select count(*)::int c from admin_queue() where kind = 'offer'`)).rows[0].c, 0, "its reports are closed");
+await assert.rejects(sql(`select admin_hide_offer($1, '')`, [o1]), /reason required/);
+await sql(`select admin_hide_offer($1, 'misleading price')`, [o1]);
+await as(null, "anon");
+assert.equal((await sql(`select count(*)::int c from offers where id = $1`, [o1])).rows[0].c, 0, "hidden by an admin");
+await as("david");
+assert.equal((await sql(`select hidden_reason from offers where id = $1`, [o1])).rows[0].hidden_reason, "misleading price", "the author sees why");
+await assert.rejects(sql(`update offers set hidden_at = null where id = $1`, [o1]), /permission denied/, "the author can't unhide");
+await as("nik");
+assert.equal((await sql(`select count(*)::int c from admin_offers(p_status => 'hidden')`)).rows[0].c, 1);
+await sql(`select admin_delete_offer($1, 'spam')`, [o1]);
+await sql(`select admin_resolve_member_reports($1, 'warned in telegram')`, [ids.david]);
+assert.equal((await sql(`select count(*)::int c from admin_queue() where kind = 'member'`)).rows[0].c, 0);
+
+await assert.rejects(sql(`select admin_review_event($1, false, '')`, [pend.id]), /reason required/);
+await sql(`select admin_review_event($1, false, 'no venue yet')`, [pend.id]);
+assert.deepEqual((await sql(`select review, review_note from events where id = $1`, [pend.id])).rows[0], { review: "rejected", review_note: "no venue yet" });
+assert.equal((await sql(`select count(*)::int c from admin_events(p_status => 'rejected')`)).rows[0].c, 1);
+await sql(`select admin_cancel_event($1, 'host asked')`, [later.id]);
+assert.equal((await sql(`select count(*)::int c from admin_events(p_status => 'cancelled')`)).rows[0].c, 1);
+const evCard = (await sql(`select admin_event($1) e`, [ev.id])).rows[0].e;
+assert.equal(evCard.connections, 2);
+assert.ok(evCard.people.some((p) => p.checked_in_at));
+assert.ok(evCard.event.checkin_code, "admins see the check-in code");
+const oldCode = evCard.event.checkin_code;
+assert.notEqual((await sql(`select admin_new_checkin_code($1) c`, [ev.id])).rows[0].c, oldCode);
+
+await sql(`select admin_set_ban($1, true, 'test')`, [ids.mia]);
+assert.equal((await sql(`select status from admin_people($1)`, [[ids.mia]])).rows[0].status, "banned", "admins see banned members");
+await sql(`select admin_set_ban($1, false, null)`, [ids.mia]);
+const log = (await sql(`select action, target_label, reason from admin_log(100)`)).rows;
+for (const a of ["keep_offer", "hide_offer", "delete_offer", "resolve_member_reports", "reject_event", "cancel_event", "new_checkin_code"]) {
+  assert.ok(log.some((r) => r.action === a), `logged: ${a}`);
+}
+assert.equal(log.find((r) => r.action === "delete_offer").target_label, "Logo design in a day", "a deleted offer keeps its title in the log");
+assert.ok(!log.some((r) => r.action === "view_member"), "views stay out of the default log");
+const page1 = (await sql(`select id from admin_log(3)`)).rows;
+const page2 = (await sql(`select id from admin_log(3, $1)`, [page1[2].id])).rows;
+assert.ok(Number(page2[0].id) < Number(page1[2].id), "paged by id");
+const dcard2 = (await sql(`select admin_member($1) m`, [ids.david])).rows[0].m;
+assert.ok(["hide_offer", "delete_offer", "resolve_member_reports"].every((a) => dcard2.actions.some((x) => x.action === a)), "offer actions show on the author's card");
+console.log("✓ admin stage 2: reports on offers (3 hide) and members, hidden offers, events review/cancel/code, queue oldest first, log; members refused");
+
 console.log("\nall schema checks passed");

@@ -10,7 +10,7 @@ type Run = (reason: string) => Promise<{ ok: true } | { error: string }>;
  * A small button that opens a reason field, then confirms. Used for ban / unban, hiding a post,
  * closing an offer. The reason goes into the admin log.
  */
-function Confirmed({ label, confirm, busyLabel, needReason, variant = "ghost", run }: { label: string; confirm: string; busyLabel: string; needReason: boolean; variant?: "ghost" | "danger" | "secondary"; run: Run }) {
+export function Confirmed({ label, confirm, busyLabel, needReason, variant = "ghost", run }: { label: string; confirm: string; busyLabel: string; needReason: boolean; variant?: "ghost" | "danger" | "secondary" | "primary"; run: Run }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");

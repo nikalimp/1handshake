@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { RemoveConnection } from "@/components/moderation";
+import { RemoveConnection, ReportMember } from "@/components/moderation";
 import { ProfileView } from "@/components/profile-view";
 import { requireMe } from "@/lib/data";
 import { loadProfile } from "@/lib/profile";
@@ -17,11 +17,10 @@ export default async function PersonPage(props: PageProps<"/people/[handle]">) {
   return (
     <div className="flex flex-col gap-8 pt-6">
       <ProfileView data={data} me={me} />
-      {data.connection && (
-        <div className="flex justify-center">
-          <RemoveConnection otherId={data.person.id} name={(data.person.name ?? "them").split(" ")[0]} />
-        </div>
-      )}
+      <div className="flex flex-col items-center gap-3">
+        {data.connection && <RemoveConnection otherId={data.person.id} name={(data.person.name ?? "them").split(" ")[0]} />}
+        {data.person.status === "active" && <ReportMember profileId={data.person.id} name={(data.person.name ?? "them").split(" ")[0]} />}
+      </div>
     </div>
   );
 }
