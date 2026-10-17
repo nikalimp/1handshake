@@ -6,6 +6,7 @@ import { getMe } from "@/lib/data";
 import { downloadCover, importFromLuma, type ImportedEvent } from "@/lib/luma";
 import { firstName, sendPush } from "@/lib/push";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { rebuildSite } from "@/lib/site-hook";
 import { createClient } from "@/lib/supabase/server";
 
 export type EventInput = {
@@ -57,6 +58,7 @@ export async function saveEvent(id: string | null, input: EventInput): Promise<{
       );
     });
   }
+  if (data.review === "approved") after(rebuildSite);
   revalidatePath("/events");
   revalidatePath("/feed");
   revalidatePath(`/events/${data.slug}`);
@@ -80,6 +82,7 @@ export async function cancelEvent(eventId: string, slug: string): Promise<{ ok: 
   const supabase = await createClient();
   const { error } = await supabase.rpc("cancel_event", { p_event: eventId });
   if (error) return { error: "only the host can cancel" };
+  after(rebuildSite);
   revalidatePath(`/events/${slug}`);
   revalidatePath("/events");
   revalidatePath("/feed");
@@ -102,6 +105,7 @@ export async function reviewEvent(eventId: string, approve: boolean): Promise<{ 
   const supabase = await createClient();
   const { error } = await supabase.rpc("review_event", { p_event: eventId, p_approve: approve });
   if (error) return { error: error.message.includes("admins only") ? "admins only" : "couldn't save. try again." };
+  after(rebuildSite);
   after(async () => {
     const admin = createAdminClient();
     if (!admin) return;
