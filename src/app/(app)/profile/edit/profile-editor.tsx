@@ -5,13 +5,11 @@ import { useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/avatar";
 import { Button, buttonClass } from "@/components/button";
 import { type City, CityPicker } from "@/components/city-picker";
-import { ListField } from "@/components/list-field";
 import { MarkdownField } from "@/components/markdown-field";
 import { type Sphere, SpherePicker } from "@/components/sphere-picker";
 import { CARD_HOST } from "@/lib/env";
 import { fileToSquareJpeg } from "@/lib/image";
 import { LINK_KINDS, type LinkKey } from "@/lib/links";
-import { MAX_NEEDS } from "@/lib/needs";
 import { createClient } from "@/lib/supabase/client";
 import { reviseBio, saveProfile } from "./actions";
 
@@ -29,8 +27,6 @@ type Me = {
   open_to_network: boolean;
   spheres: number[];
   links: Partial<Record<LinkKey, string>>;
-  needs: string[];
-  cans: string[];
 };
 
 const field = "w-full rounded-[var(--radius-md)] border border-line bg-surface px-4 py-3 outline-none focus:border-line-strong";
@@ -96,8 +92,6 @@ export function ProfileEditor({ me, spheres, voice = false }: { me: Me; spheres:
         open_to_network: form.open_to_network,
         spheres: form.spheres,
         links: form.links,
-        needs: form.needs,
-        cans: form.cans,
       });
       if ("error" in res) setError(res.error);
       else {
@@ -170,11 +164,13 @@ export function ProfileEditor({ me, spheres, voice = false }: { me: Me; spheres:
         />
       </section>
 
-      <section className="flex flex-col gap-5 rounded-[var(--radius-lg)] bg-surface p-5 shadow-[var(--shadow-card)]" aria-label="i need and i can">
-        <p className="text-sm text-ink-muted">members see these and connect finds you matches. on your public card they stay blurred.</p>
-        <ListField label="i need" items={form.needs} onChange={(v) => set("needs", v)} max={MAX_NEEDS} placeholder="e.g. a cto for a fintech startup" />
-        <ListField label="i can" items={form.cans} onChange={(v) => set("cans", v)} max={MAX_NEEDS} placeholder="e.g. review your pitch deck" />
-      </section>
+      <Link href="/profile#offers" className="flex items-center justify-between gap-3 rounded-[var(--radius-lg)] bg-surface p-5 shadow-[var(--shadow-card)]">
+        <span>
+          <span className="block font-semibold">offers</span>
+          <span className="block text-sm text-ink-muted">orders, projects, products and services — they live on your profile</span>
+        </span>
+        <span aria-hidden>→</span>
+      </Link>
 
       <section className="flex flex-col gap-3 rounded-[var(--radius-lg)] bg-surface p-5 shadow-[var(--shadow-card)]" aria-label="links">
         <div>

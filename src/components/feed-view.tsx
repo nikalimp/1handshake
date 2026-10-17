@@ -6,17 +6,19 @@ import { GoingButton, RegisterLink } from "@/components/event-controls";
 import { EventCover, EventFacts } from "@/components/event-view";
 import { BackButton, RequestActions } from "@/components/feed-controls";
 import { ReportHandshake } from "@/components/moderation";
+import { OfferCard } from "@/components/offer-card";
 import { PushCard } from "@/components/push-card";
 import { ScreenTitle } from "@/components/screen-title";
 import { FireButton } from "@/components/wall-controls";
 import type { Card } from "@/lib/data";
 import { coverUrl, type EventRow, isOver } from "@/lib/event-format";
+import type { Offer } from "@/lib/offers";
 
 export type Incoming = { id: string; from_id: string; created_at: string; fires: number; mutuals: string[]; event_id: string | null };
 export type FeedEvent = EventRow & { city: string | null };
 export type ToBack = { id: string; from_id: string; to_id: string; created_at: string; backed: boolean; fires: number };
 export type Event = {
-  kind: "handshake" | "intro" | "post" | "event" | "event_met";
+  kind: "handshake" | "intro" | "post" | "event" | "event_met" | "offer";
   id: string;
   at: string;
   actor_id: string;
@@ -67,10 +69,11 @@ export type FeedData = {
   avatars: Map<string, string>;
   selfies: Map<string, string>;
   eventsById: Map<string, FeedEvent>;
+  offersById: Map<string, Offer>;
 };
 
 /** The feed screen: requests to answer, intros to back, and what happened around me. */
-export function FeedView({ me, incoming, toBack, events, people, avatars, selfies, eventsById }: FeedData) {
+export function FeedView({ me, incoming, toBack, events, people, avatars, selfies, eventsById, offersById }: FeedData) {
   const face = (id: string, size: number) => {
     const p = people.get(id);
     return <Avatar name={p?.name ?? null} size={size} src={p?.avatar_path ? avatars.get(p.avatar_path) : undefined} />;
@@ -227,6 +230,30 @@ export function FeedView({ me, incoming, toBack, events, people, avatars, selfie
                       <p className="meta">{ev.cancelled_at ? "cancelled" : `over · 🙋 ${e.fires} went`}</p>
                     )}
                   </div>
+                </article>
+              );
+            }
+            if (e.kind === "offer") {
+              const o = offersById.get(e.id);
+              if (!o) return null;
+              const own = o.profile_id === me.id;
+              return (
+                <article key={`o-${e.id}`} className="flex flex-col gap-3 rounded-[var(--radius-lg)] bg-surface p-4 shadow-[var(--shadow-card)]">
+                  <div className="flex items-center gap-3">
+                    {face(e.actor_id, 36)}
+                    <div className="min-w-0">
+                      <p className="font-semibold">
+                        <Name person={actor} me={me} /> <span className="font-normal text-ink-muted">posted an offer</span>
+                      </p>
+                      <p className="meta">{when(e.at)}</p>
+                    </div>
+                  </div>
+                  <OfferCard offer={o} viewer={own ? "guest" : "member"} count={e.fires} mine={e.fired} clamp />
+                  {own && (
+                    <Link href="/profile#offers" className="meta hover:text-ink">
+                      {e.fires > 0 ? `${e.fires} interested — see who →` : "manage your offers →"}
+                    </Link>
+                  )}
                 </article>
               );
             }

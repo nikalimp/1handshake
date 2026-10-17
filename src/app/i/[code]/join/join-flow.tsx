@@ -7,12 +7,10 @@ import { type City, CityPicker } from "@/components/city-picker";
 import { Confetti } from "@/components/confetti";
 import { Logo } from "@/components/logo";
 import { Progress } from "@/components/progress";
-import { ListField } from "@/components/list-field";
 import { MarkdownField } from "@/components/markdown-field";
 import { type Sphere, SpherePicker } from "@/components/sphere-picker";
 import { CARD_HOST, PRIVACY_URL, TERMS_URL } from "@/lib/env";
 import { fileToSquareJpeg } from "@/lib/image";
-import { MAX_NEEDS } from "@/lib/needs";
 import { useRecorder } from "@/lib/use-recorder";
 import { createClient } from "@/lib/supabase/client";
 import { joinClub, makeCard, markStep } from "./actions";
@@ -24,7 +22,7 @@ const PROMPTS = ["who you are", "what you do", "what you need", "what you can he
 export function JoinFlow({ code, uid, inviterName, defaults, guess, serverVoice, spheres }: { code: string; uid: string; inviterName: string; defaults: { name: string; handle: string }; guess: City | null; serverVoice: boolean; spheres: Sphere[] }) {
   const [step, setStep] = useState<Step>("about");
   const [transcript, setTranscript] = useState("");
-  const [card, setCard] = useState<CardFields>({ name: defaults.name, role: "", handle: defaults.handle, bio_md: "", spheres: [], needs: [], cans: [] });
+  const [card, setCard] = useState<CardFields>({ name: defaults.name, role: "", handle: defaults.handle, bio_md: "", spheres: [] });
   const [ai, setAi] = useState(false);
   const [draftAt, setDraftAt] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +41,7 @@ export function JoinFlow({ code, uid, inviterName, defaults, guess, serverVoice,
       setStep("about");
       return;
     }
-    setCard({ name: res.name || defaults.name, role: res.role, handle: res.handle || defaults.handle, bio_md: res.bio_md, spheres: res.sphereIds, needs: res.needs, cans: res.cans });
+    setCard({ name: res.name || defaults.name, role: res.role, handle: res.handle || defaults.handle, bio_md: res.bio_md, spheres: res.sphereIds });
     setAi(res.ai);
     setStep("card");
   };
@@ -228,7 +226,7 @@ function AboutStep({
 
 // --- Step 2: your card -------------------------------------------------------------------------
 
-type CardFields = { name: string; role: string; handle: string; bio_md: string; spheres: number[]; needs: string[]; cans: string[] };
+type CardFields = { name: string; role: string; handle: string; bio_md: string; spheres: number[] };
 
 function CardStep({
   code,
@@ -361,7 +359,7 @@ function CardStep({
         <MarkdownField value={card.bio_md} onChange={(v) => setCard((c) => ({ ...c, bio_md: v }))} defaultView="preview" />
       </article>
 
-      <section className="mt-4 flex flex-col gap-5 rounded-[var(--radius-lg)] bg-surface p-5 shadow-[var(--shadow-card)]" aria-label="what you work in, need and can">
+      <section className="mt-4 flex flex-col gap-5 rounded-[var(--radius-lg)] bg-surface p-5 shadow-[var(--shadow-card)]" aria-label="what you work in">
         <div className="flex flex-col gap-3">
           <div>
             <p className="font-semibold">what you work in</p>
@@ -369,8 +367,6 @@ function CardStep({
           </div>
           <SpherePicker value={card.spheres} onChange={(v) => setCard((c) => ({ ...c, spheres: v }))} spheres={spheres} />
         </div>
-        <ListField label="i need" hint="members see it, and connect shows you people who can help" items={card.needs} onChange={(v) => setCard((c) => ({ ...c, needs: v }))} max={MAX_NEEDS} placeholder="e.g. a backend engineer" />
-        <ListField label="i can" items={card.cans} onChange={(v) => setCard((c) => ({ ...c, cans: v }))} max={MAX_NEEDS} placeholder="e.g. review your pitch deck" />
       </section>
 
       <div className="mt-5 flex flex-col gap-4">

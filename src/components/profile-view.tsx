@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Avatar } from "@/components/avatar";
+import { buttonClass } from "@/components/button";
 import { Markdown } from "@/components/markdown";
 import { ReportHandshake } from "@/components/moderation";
-import { NeedsTabs } from "@/components/needs-tabs";
+import { OfferCard } from "@/components/offer-card";
 import { SocialLinks } from "@/components/social-links";
 import { FireButton, RemovePost, WallComposer } from "@/components/wall-controls";
 import type { Card } from "@/lib/data";
@@ -24,7 +25,7 @@ function PersonLink({ person, children }: { person?: Card | null; children: Reac
 
 /** Internal profile: the visit card for members, plus the wall. Used for my profile and for others. */
 export function ProfileView({ data, me, actions }: { data: LoadedProfile; me: Card; actions?: ReactNode }) {
-  const { person, isMe, connection, wall, people, avatars, selfies, spheres, needs, cans } = data;
+  const { person, isMe, connection, wall, people, avatars, selfies, spheres, offers } = data;
   const canWrite = isMe || connection !== null;
 
   return (
@@ -54,9 +55,29 @@ export function ProfileView({ data, me, actions }: { data: LoadedProfile; me: Ca
           </ul>
         )}
         {person.bio_md && <Markdown source={person.bio_md} />}
-        <NeedsTabs needs={needs} cans={cans} isMe={isMe} firstName={firstName(person)} />
         <SocialLinks links={person.links} />
       </article>
+
+      {(offers.length > 0 || isMe) && (
+        <section id="offers" className="flex scroll-mt-6 flex-col gap-3" aria-label="offers">
+          <div className="flex items-center justify-between px-0.5">
+            <h2 className="text-[22px] leading-7 font-extrabold tracking-[-0.02em]">offers</h2>
+            {isMe && (
+              <Link href="/offers/new" className={buttonClass("primary", "sm")}>
+                + offer
+              </Link>
+            )}
+          </div>
+          {offers.map((o) => (
+            <OfferCard key={o.offer.id} offer={o.offer} viewer={isMe ? "owner" : "member"} count={o.count} mine={o.mine} interested={o.interested} />
+          ))}
+          {isMe && offers.length === 0 && (
+            <Link href="/offers/new" className="rounded-[var(--radius-md)] border border-dashed border-line-strong px-4 py-3 text-sm text-ink-muted">
+              + post an order, a project, a product or a service — it goes on your public card and into your connections&apos; feed
+            </Link>
+          )}
+        </section>
+      )}
 
       <section className="flex flex-col gap-4" aria-label="wall">
         <h2 className="px-0.5 text-[22px] leading-7 font-extrabold tracking-[-0.02em]">wall</h2>

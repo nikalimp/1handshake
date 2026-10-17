@@ -14,7 +14,7 @@ export default async function DeletePage() {
           <p className="font-semibold">what happens</p>
           <ul className="flex flex-col gap-2 text-[15px]">
             <li>👻 your card becomes a ghost: no name, photo, city or text. your public card and llms.txt go away.</li>
-            <li>🗑 your wall, posts, fires, i need / i can, links, photos and selfies are deleted.</li>
+            <li>🗑 your wall, posts, fires, offers, links, photos and selfies are deleted; your events are cancelled.</li>
             <li>🔗 your connections stay as an anonymous dot in their graphs, so their intros don&apos;t break.</li>
             <li>🔑 your google sign-in is removed. to come back you&apos;d need a new invite.</li>
           </ul>

@@ -1,7 +1,7 @@
 import "server-only";
 import { geminiJson, hasGemini } from "@/lib/gemini";
 
-export type DraftCard = { name: string; role: string; handle: string; bio_md: string; spheres: string[]; needs: string[]; cans: string[] };
+export type DraftCard = { name: string; role: string; handle: string; bio_md: string; spheres: string[] };
 
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5-5";
 
@@ -17,8 +17,6 @@ rules:
   "## Can help with" (list), "## Looking for" (list). no H1, no other heading levels.
   concrete over generic: keep projects, companies, numbers and cities they mention. no buzzwords, no emoji.
 - spheres: 1–3 names copied exactly from the list of spheres given, the best fit first. empty if nothing fits.
-- needs: up to 5 short lines (under 80 characters each) of what they're looking for — people, roles, intros, help. only what they said.
-- cans: up to 5 short lines (under 80 characters each) of what they can help others with. only what they said.
 - don't invent facts that aren't in the intro.`;
 
 const TOOL = {
@@ -32,10 +30,8 @@ const TOOL = {
       handle: { type: "string" },
       bio_md: { type: "string" },
       spheres: { type: "array", items: { type: "string" } },
-      needs: { type: "array", items: { type: "string" } },
-      cans: { type: "array", items: { type: "string" } },
     },
-    required: ["name", "role", "handle", "bio_md", "spheres", "needs", "cans"],
+    required: ["name", "role", "handle", "bio_md", "spheres"],
   },
 };
 
@@ -52,7 +48,7 @@ export function handleFrom(text: string) {
 
 /** Without an API key (or if the call fails) the card is the transcript as is — the guest edits it. */
 export function fallbackCard(transcript: string, googleName: string, email: string): DraftCard {
-  return { name: googleName, role: "", handle: handleFrom(googleName || email.split("@")[0]), bio_md: transcript.trim(), spheres: [], needs: [], cans: [] };
+  return { name: googleName, role: "", handle: handleFrom(googleName || email.split("@")[0]), bio_md: transcript.trim(), spheres: [] };
 }
 
 const CARD_SCHEMA = {
@@ -63,10 +59,8 @@ const CARD_SCHEMA = {
     handle: { type: "STRING" },
     bio_md: { type: "STRING" },
     spheres: { type: "ARRAY", items: { type: "STRING" } },
-    needs: { type: "ARRAY", items: { type: "STRING" } },
-    cans: { type: "ARRAY", items: { type: "STRING" } },
   },
-  required: ["name", "role", "handle", "bio_md", "spheres", "needs", "cans"],
+  required: ["name", "role", "handle", "bio_md", "spheres"],
 };
 
 const list = (v: unknown, max: number) =>
@@ -80,8 +74,6 @@ const finish = (card: Partial<DraftCard> | null | undefined, googleName: string)
         handle: handleFrom(card.handle || card.name || googleName),
         bio_md: card.bio_md.slice(0, 4000),
         spheres: list(card.spheres, 3),
-        needs: list(card.needs, 5),
-        cans: list(card.cans, 5),
         ai: true,
       }
     : null;

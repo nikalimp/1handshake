@@ -347,4 +347,34 @@ const exp2 = (await sql(`select my_export() e`)).rows[0].e;
 assert.equal(exp2.events_attended.length, 1);
 console.log("✓ events: host → admin approves → going → members check in with the QR (non-members can't) → connect at the event");
 
+// 13. Offers replace i need / i can: needs become orders, cans go; public cards, interest, feed, limit
+await asAdmin();
+await db.exec(readFileSync("supabase/migrations/20261017000100_offers.sql", "utf8"));
+assert.deepEqual((await sql(`select kind, title from offers where profile_id = $1`, [ids.nik])).rows, [{ kind: "order", title: "a backend engineer" }], "i need became an order");
+assert.equal((await sql(`select to_regclass('public.needs_offers') t`)).rows[0].t, null, "the old table is gone");
+await as(null, "anon");
+assert.equal((await sql(`select count(*)::int c from offers where profile_id = $1`, [ids.nik])).rows[0].c, 1, "offers are public");
+await assert.rejects(sql(`insert into offers (profile_id, kind, title) values ($1, 'service', 'hack')`, [ids.nik]), /permission denied/);
+await as("anna");
+const off = (await sql(`insert into offers (profile_id, kind, title, body_md, price, link) values (auth.uid(), 'service', 'Brand identity in two weeks', 'logo, colors, type', 'from $900', 'https://anna.design') returning id`)).rows[0];
+await assert.rejects(sql(`insert into offers (profile_id, kind, title) values ($1, 'service', 'as nik')`, [ids.nik]), /row-level security/);
+await assert.rejects(sql(`insert into offer_interest (offer_id, profile_id) values ($1, auth.uid())`, [off.id]), /row-level security/, "not in your own offer");
+await as("nik");
+await sql(`insert into offer_interest (offer_id, profile_id) values ($1, auth.uid())`, [off.id]);
+assert.deepEqual((await sql(`select kind, fired from feed() where kind = 'offer' and id = $1`, [off.id])).rows, [{ kind: "offer", fired: true }]);
+await as("david");
+assert.equal((await sql(`select count(*)::int c from offer_interest`)).rows[0].c, 0, "others don't see who is interested");
+await as("anna");
+assert.equal((await sql(`select profile_id from offer_interest where offer_id = $1`, [off.id])).rows[0].profile_id, ids.nik, "the author sees who");
+assert.equal((await sql(`select interested from offer_counts(auth.uid())`)).rows[0].interested, 1);
+for (let i = 0; i < 9; i++) await sql(`insert into offers (profile_id, kind, title) values (auth.uid(), 'product', $1)`, [`thing number ${i}`]);
+await assert.rejects(sql(`insert into offers (profile_id, kind, title) values (auth.uid(), 'product', 'eleventh')`), /too many open offers/);
+await sql(`update offers set closed_at = now() where title = 'thing number 0'`);
+await sql(`insert into offers (profile_id, kind, title) values (auth.uid(), 'product', 'eleventh, after closing one')`);
+assert.equal((await sql(`select my_export() e`)).rows[0].e.offers.length, 11);
+await sql(`select become_ghost()`);
+await asAdmin();
+assert.equal((await sql(`select count(*)::int c from offers where profile_id = $1`, [ids.anna])).rows[0].c, 0, "a ghost has no offers");
+console.log("✓ offers: needs → orders, public, interest seen by the author only, in the feed, 10 open at most, ghost");
+
 console.log("\nall schema checks passed");

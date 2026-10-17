@@ -1,6 +1,7 @@
 import { FeedView, type Event, type Incoming, type ToBack } from "@/components/feed-view";
 import { CARD_FIELDS, requireMe, type Card } from "@/lib/data";
 import { EVENT_FIELDS, type EventRow } from "@/lib/event-format";
+import { OFFER_FIELDS, type Offer } from "@/lib/offers";
 import { signedUrls } from "@/lib/files";
 import { createClient } from "@/lib/supabase/server";
 
@@ -38,11 +39,14 @@ export default async function FeedPage() {
   const { data: cityRows } = cityIds.length ? await supabase.from("cities").select("id, name").in("id", cityIds).returns<{ id: number; name: string }[]>() : { data: [] };
   const cityName = new Map((cityRows ?? []).map((c) => [c.id, c.name]));
   const eventsById = new Map((evRows ?? []).map((e) => [e.id, { ...e, city: e.city_id ? (cityName.get(e.city_id) ?? null) : null }]));
+  const offerIds = events.filter((e) => e.kind === "offer").map((e) => e.id);
+  const { data: offerRows } = offerIds.length ? await supabase.from("offers").select(OFFER_FIELDS).in("id", offerIds).returns<Offer[]>() : { data: [] as Offer[] };
+  const offersById = new Map((offerRows ?? []).map((o) => [o.id, o]));
   const { data: cards } = ids.length ? await supabase.from("profiles").select(CARD_FIELDS).in("id", ids).returns<Card[]>() : { data: [] as Card[] };
   const people = new Map<string, Card>([...(cards ?? []), me].map((c) => [c.id, c]));
   const [avatars, selfies] = await Promise.all([
     signedUrls(supabase, "avatars", [...people.values()].map((p) => p.avatar_path)),
     signedUrls(supabase, "selfies", events.map((e) => e.selfie_path)),
   ]);
-  return <FeedView me={me} incoming={incoming} toBack={toBack} events={events.filter((e) => e.kind !== "event" || eventsById.has(e.id))} people={people} avatars={avatars} selfies={selfies} eventsById={eventsById} />;
+  return <FeedView me={me} incoming={incoming} toBack={toBack} events={events.filter((e) => (e.kind !== "event" || eventsById.has(e.id)) && (e.kind !== "offer" || offersById.has(e.id)))} people={people} avatars={avatars} selfies={selfies} eventsById={eventsById} offersById={offersById} />;
 }

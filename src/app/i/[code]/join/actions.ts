@@ -1,6 +1,5 @@
 "use server";
 import { draftCard, type DraftCard } from "@/lib/ai-card";
-import { MAX_NEEDS } from "@/lib/needs";
 import { createClient } from "@/lib/supabase/server";
 
 async function signedInUser() {
@@ -34,8 +33,6 @@ export type JoinInput = {
   avatar_path: string | null;
   agreed: boolean;
   spheres: number[];
-  needs: string[];
-  cans: string[];
 };
 
 /** Creates the profile, the 🤝 connection with the inviter and uses up the code — all or nothing. */
@@ -68,15 +65,9 @@ export async function joinClub(input: JoinInput): Promise<{ ok: true } | { error
   if (input.avatar_path?.startsWith(`${user.id}/`)) {
     await supabase.from("profiles").update({ avatar_path: input.avatar_path }).eq("id", user.id);
   }
-  // Spheres and i need / i can, if any (the member can change them later in their profile).
+  // Spheres, if any (the member can change them later in their profile).
   const picked = [...new Set(input.spheres)].slice(0, 3);
   if (picked.length) await supabase.from("profile_spheres").insert(picked.map((sphere_id, i) => ({ profile_id: user.id, sphere_id, is_primary: i === 0 })));
-  const tidy = (l: string[]) => [...new Set(l.map((x) => x.trim()).filter(Boolean))].slice(0, MAX_NEEDS).map((x) => x.slice(0, 200));
-  const rows = [...tidy(input.needs).map((body) => ({ kind: "need", body })), ...tidy(input.cans).map((body) => ({ kind: "can", body }))];
-  if (rows.length) {
-    const t = Date.now();
-    await supabase.from("needs_offers").insert(rows.map((r, i) => ({ ...r, profile_id: user.id, created_at: new Date(t + i).toISOString() })));
-  }
   // Photos tried and replaced during registration aren't needed anymore.
   const { data: files } = await supabase.storage.from("avatars").list(user.id, { limit: 100 });
   const stale = (files ?? []).map((f) => `${user.id}/${f.name}`).filter((p) => p !== input.avatar_path);

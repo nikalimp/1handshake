@@ -5,7 +5,8 @@ import { buttonClass } from "@/components/button";
 import { Logo } from "@/components/logo";
 import { Markdown, plainText } from "@/components/markdown";
 import { SocialLinks } from "@/components/social-links";
-import { cardToMarkdown, getCardByHandle } from "@/lib/cards";
+import { cardToMarkdown, getCardByHandle, getOpenOffers } from "@/lib/cards";
+import { OfferCard } from "@/components/offer-card";
 import { getMe } from "@/lib/data";
 import { APP_URL, CARD_HOST, CARD_URL } from "@/lib/env";
 import { signedUrls } from "@/lib/files";
@@ -34,8 +35,8 @@ export default async function VisitCard(props: PageProps<"/u/[handle]">) {
 
   const supabase = await createClient();
   const viewer = await getMe();
-  const { data: countRows } = await supabase.rpc("needs_count", { p_profile: card.id });
-  const counts = ((countRows ?? [])[0] as { needs: number; cans: number } | undefined) ?? { needs: 0, cans: 0 };
+  const [offers, { data: countRows }] = await Promise.all([getOpenOffers(card.id), supabase.rpc("offer_counts", { p_profile: card.id })]);
+  const counts = new Map(((countRows ?? []) as { offer_id: string; interested: number }[]).map((c) => [c.offer_id, c.interested]));
 
   if (card.status === "ghost") {
     return (
@@ -60,18 +61,15 @@ export default async function VisitCard(props: PageProps<"/u/[handle]">) {
         {card.cities?.name && <span className="meta">{card.cities.name}</span>}
         {card.bio_md && <Markdown source={card.bio_md} />}
         <SocialLinks links={card.links} />
-        {(counts.needs > 0 || counts.cans > 0) && (
-          <div className="relative overflow-hidden rounded-[var(--radius-md)] bg-surface-sunk p-4" aria-label="i need and i can — visible to members">
-            <div className="flex flex-col gap-2 blur-[5px] select-none" aria-hidden>
-              {counts.needs > 0 && <p>i need: someone who knows this space well, and an intro or two.</p>}
-              {counts.cans > 0 && <p>i can: help with what i know best, review your work, share contacts.</p>}
-            </div>
-            <span className="absolute inset-0 grid place-items-center px-4 text-center text-sm font-semibold">
-              {[counts.needs > 0 && `needs ${counts.needs}`, counts.cans > 0 && `can help with ${counts.cans}`].filter(Boolean).join(" · ")} · 🤝 members see it
-            </span>
-          </div>
+        {offers.length > 0 && (
+          <section className="flex flex-col gap-3" aria-label="offers">
+            <h2 className="text-lg font-extrabold">offers</h2>
+            {offers.map((o) => (
+              <OfferCard key={o.id} offer={o} viewer="guest" count={counts.get(o.id) ?? 0} />
+            ))}
+          </section>
         )}
-        <pre className="rounded-[var(--radius-sm)] border border-dashed border-line-strong p-3 font-mono text-xs leading-[18px] whitespace-pre-wrap text-ink-muted">{cardToMarkdown(card)}</pre>
+        <pre className="rounded-[var(--radius-sm)] border border-dashed border-line-strong p-3 font-mono text-xs leading-[18px] whitespace-pre-wrap text-ink-muted">{cardToMarkdown(card, offers)}</pre>
         {viewer ? (
           <a href={viewer.id === card.id ? `${APP_URL}/profile` : `${APP_URL}/people/${card.handle}`} className={buttonClass("primary")}>
             {viewer.id === card.id ? "open my profile" : "open in the club"}
