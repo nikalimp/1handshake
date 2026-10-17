@@ -3,12 +3,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/avatar";
+import { ImageCropper } from "@/components/image-cropper";
 import { Button, buttonClass } from "@/components/button";
 import { type City, CityPicker } from "@/components/city-picker";
 import { MarkdownField } from "@/components/markdown-field";
 import { type Sphere, SpherePicker } from "@/components/sphere-picker";
 import { CARD_HOST } from "@/lib/env";
-import { fileToSquareJpeg } from "@/lib/image";
 import { LINK_KINDS, type LinkKey } from "@/lib/links";
 import { createClient } from "@/lib/supabase/client";
 import { reviseBio, saveProfile } from "./actions";
@@ -61,11 +61,11 @@ export function ProfileEditor({ me, spheres, voice = false }: { me: Me; spheres:
 
   const set = <K extends keyof Me>(k: K, v: Me[K]) => setForm((f) => ({ ...f, [k]: v }));
 
-  const pickPhoto = async (f: File) => {
+  const [cropping, setCropping] = useState<File | null>(null);
+  const pickPhoto = async (blob: Blob) => {
     setUploading(true);
     setError(null);
     try {
-      const blob = await fileToSquareJpeg(f, 640);
       const path = `${me.id}/${crypto.randomUUID()}.jpg`;
       const { error } = await supabase.storage.from("avatars").upload(path, blob, { contentType: "image/jpeg" });
       if (error) throw error;
@@ -130,9 +130,10 @@ export function ProfileEditor({ me, spheres, voice = false }: { me: Me; spheres:
             onChange={(e) => {
               const f = e.target.files?.[0];
               e.target.value = "";
-              if (f) void pickPhoto(f);
+              if (f) setCropping(f);
             }}
           />
+        {cropping && <ImageCropper file={cropping} onCancel={() => setCropping(null)} onDone={(b) => { setCropping(null); void pickPhoto(b); }} />}
         </div>
         <label className="flex flex-col gap-1.5">
           <span className="meta">name</span>

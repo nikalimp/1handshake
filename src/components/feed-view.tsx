@@ -82,14 +82,9 @@ export function FeedView({ me, incoming, toBack, events, people, avatars, selfie
   return (
     <>
       <ScreenTitle title="feed">
-        <span className="flex gap-2">
-          <Link href="/events" className={buttonClass("ghost", "sm")}>
-            events
-          </Link>
-          <Link href="/events/new" className={buttonClass("primary", "sm")}>
-            + host event
-          </Link>
-        </span>
+        <Link href="/events/new" className={buttonClass("primary", "sm")}>
+          + host event
+        </Link>
       </ScreenTitle>
       <div className="flex flex-col gap-8">
         <PushCard />

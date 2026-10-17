@@ -279,7 +279,7 @@ function useCountdown(until: string) {
 function CodeStep({ invite, selfie, onExpired, onRetake }: { invite: Invite; selfie: Selfie; onExpired: () => void; onRetake: () => void }) {
   const left = useCountdown(invite.expires_at);
   const ended = useRef(false);
-  const total = 5 * 60 * 1000;
+  const total = 10 * 60 * 1000;
   const [origin] = useState(() => window.location.origin);
   const url = `${origin}/i/${invite.code}`;
 
@@ -302,7 +302,7 @@ function CodeStep({ invite, selfie, onExpired, onRetake }: { invite: Invite; sel
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-sunk">
             <div className="h-full rounded-full bg-fire transition-[width] duration-300 ease-linear" style={{ width: `${(left / total) * 100}%` }} />
           </div>
-          <span className="meta">expires in 5 minutes · single use</span>
+          <span className="meta">expires in 10 minutes · single use</span>
         </div>
       </div>
       <p className="meta mt-3 text-center break-all">{url.replace(/^https?:\/\//, "")}</p>
@@ -317,9 +317,17 @@ function CodeStep({ invite, selfie, onExpired, onRetake }: { invite: Invite; sel
 
 function WaitingStep({ invite, onCancel }: { invite: Invite; onCancel: () => void }) {
   const at = STEPS.findIndex((st) => st.key === (invite.guest_step ?? "welcome"));
+  // After the scan the guest has until expires_at to finish (30 minutes).
+  const left = useCountdown(invite.expires_at);
+  const s = Math.ceil(left / 1000);
+  const clock = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
   return (
     <>
       <Title title="they scanned it" sub="waiting while they join the club" />
+      <div className="mb-3 flex items-center justify-between rounded-[var(--radius-lg)] bg-surface px-5 py-3 shadow-[var(--shadow-card)]">
+        <span className="meta">time left for them to finish</span>
+        <span className={`font-mono text-[22px] leading-7 font-medium tabular-nums ${left < 3 * 60 * 1000 ? "text-fire-ink" : ""}`}>{clock}</span>
+      </div>
       <ol className="flex flex-col gap-1 rounded-[var(--radius-lg)] bg-surface p-5 shadow-[var(--shadow-card)]">
         {STEPS.map((st, i) => {
           const done = i < at || (i === at && st.key === "done");
@@ -375,7 +383,7 @@ function ExpiredStep({ onSameSelfie, onRetake, error }: { onSameSelfie?: () => v
     <div className="flex flex-col items-center gap-4 px-2 pt-16 text-center">
       <SadFace className="text-ink-muted" />
       <h1 className="text-[30px] leading-[34px] font-extrabold tracking-[-0.03em]">the code expired</h1>
-      <p className="text-ink-muted">nobody scanned it in 5 minutes. no worries — make a new one.</p>
+      <p className="text-ink-muted">nobody scanned it in 10 minutes. no worries — make a new one.</p>
       {error && (
         <p role="alert" className="text-sm text-fire-ink">
           {error}

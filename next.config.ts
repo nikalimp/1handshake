@@ -8,7 +8,8 @@ const assetPrefix = process.env.ASSET_PREFIX ?? (process.env.VERCEL_ENV === "pro
 // Once the main site serves the cards (NEXT_PUBLIC_CARD_URL=https://1handshake.com), cards live only there:
 // the app sends its own /@handle and /e/:slug over. The site proxies them back
 // to the app's internal /u/:handle and /ev/:slug paths, so this never loops.
-const cardUrl = (process.env.NEXT_PUBLIC_CARD_URL ?? "").replace(/\/$/, "");
+// In production that's the default now (the site proxies cards since 2026-10-17); NEXT_PUBLIC_CARD_URL overrides it.
+const cardUrl = (process.env.NEXT_PUBLIC_CARD_URL ?? (process.env.VERCEL_ENV === "production" ? "https://1handshake.com" : "")).replace(/\/$/, "");
 const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "");
 const mainUrl = (process.env.NEXT_PUBLIC_MAIN_URL ?? "https://1handshake.com").replace(/\/$/, "");
 const cardsOnMainSite = Boolean(cardUrl) && cardUrl !== appUrl;
@@ -18,6 +19,8 @@ const onAdmin = adminHost ? [{ type: "host" as const, value: adminHost }] : unde
 
 const nextConfig: NextConfig = {
   assetPrefix,
+  // src/lib/env.ts reads it: share links, canonical and og:url of cards and event pages.
+  env: cardUrl ? { NEXT_PUBLIC_CARD_URL: cardUrl } : {},
   // Cache Components are off for now: every page reads the Supabase session cookie.
   // Turn them on later, page by page, following node_modules/next/dist/docs/01-app/02-guides/authentication-with-cache-components.md
   turbopack: {

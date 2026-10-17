@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { Avatar } from "@/components/avatar";
+import { ImageCropper } from "@/components/image-cropper";
 import { Button } from "@/components/button";
 import { type City, CityPicker } from "@/components/city-picker";
 import { Confetti } from "@/components/confetti";
@@ -10,7 +11,6 @@ import { Progress } from "@/components/progress";
 import { MarkdownField } from "@/components/markdown-field";
 import { type Sphere, SpherePicker } from "@/components/sphere-picker";
 import { CARD_HOST, PRIVACY_URL, TERMS_URL } from "@/lib/env";
-import { fileToSquareJpeg } from "@/lib/image";
 import { useRecorder } from "@/lib/use-recorder";
 import { createClient } from "@/lib/supabase/client";
 import { joinClub, makeCard, markStep } from "./actions";
@@ -31,11 +31,14 @@ export function JoinFlow({ code, uid, inviterName, defaults, guess, serverVoice,
     void markStep(code, "about");
   }, [code]);
 
-  const draft = async () => {
+  // Called with the fresh text right after a recording ends: the voice goes straight into the card,
+  // without a screen to review the transcript. Typed text goes through the "make my card" button.
+  const draft = async (text = transcript) => {
+    if (text.trim().length < 20) return;
     setError(null);
     setDraftAt(Date.now());
     setStep("drafting");
-    const res = await makeCard(code, transcript);
+    const res = await makeCard(code, text);
     if ("error" in res) {
       setError(res.error);
       setStep("about");
@@ -97,7 +100,7 @@ function AboutStep({
 }: {
   transcript: string;
   setTranscript: (f: (t: string) => string) => void;
-  onNext: () => void;
+  onNext: (text?: string) => void;
   error: string | null;
   serverVoice: boolean;
 }) {
@@ -106,7 +109,19 @@ function AboutStep({
   const [interim, setInterim] = useState("");
   // Voice: recorded and transcribed on the server (Gemini) when it's set up, else the browser's own
   // speech recognition (Chrome, Safari). Typing works everywhere.
-  const recorder = useRecorder((text) => setTranscript((t) => `${t}${t && !t.endsWith(" ") ? " " : ""}${text}`), 180);
+  const join = (t: string, more: string) => `${t}${t && !t.endsWith(" ") ? " " : ""}${more.trim()}`;
+  // the whole text so far, for the browser recognizer's callbacks
+  const text = useRef(transcript);
+  useEffect(() => {
+    text.current = transcript;
+  }, [transcript]);
+  const [typing, setTyping] = useState(false);
+  const recorder = useRecorder((more) => {
+    const next = join(text.current, more);
+    setTranscript(() => next);
+    if (next.trim().length >= 20) onNext(next);
+    else setTyping(true);
+  }, 180);
   const recorderOk = serverVoice && recorder.supported;
   const browserOk = useSyncExternalStore(noSubscribe, () => recognitionCtor() !== null, () => false);
   const supported = recorderOk || browserOk;
@@ -138,18 +153,25 @@ function AboutStep({
         if (res.isFinal) finals += res[0].transcript;
         else live += res[0].transcript;
       }
-      if (finals) setTranscript((t) => `${t}${t && !t.endsWith(" ") ? " " : ""}${finals.trim()}`);
+      if (finals) {
+        text.current = join(text.current, finals);
+        setTranscript(() => text.current);
+      }
       setInterim(live);
     };
     r.onend = () => {
       setBrowserListening(false);
       setInterim("");
+      if (text.current.trim().length >= 20) onNext(text.current);
+      else if (text.current) setTyping(true);
     };
     r.onerror = () => setBrowserListening(false);
     rec.current = r;
     r.start();
     setBrowserListening(true);
   };
+
+  const showText = !supported || typing || Boolean(transcript) || Boolean(interim);
 
   return (
     <section className="flex flex-1 flex-col">
@@ -193,33 +215,41 @@ function AboutStep({
                 ? recorderOk
                   ? `recording ${Math.floor(recorder.seconds / 60)}:${String(recorder.seconds % 60).padStart(2, "0")} · tap to stop`
                   : "listening… tap to stop"
-                : "tap to record · or type below"}
+                : "tap to record. we'll make your card right away"}
             </span>
           )}
           {recorder.error && <span className="text-sm text-fire-ink">{recorder.error}</span>}
         </div>
       )}
 
-      <label className="mt-6 flex flex-col gap-2">
-        <span className="meta">transcript</span>
-        <textarea
-          value={transcript + (interim ? ` ${interim}` : "")}
-          onChange={(e) => setTranscript(() => e.target.value)}
-          rows={7}
-          placeholder="hi, i'm anna. i'm building an ai notes app for founders in tbilisi. looking for a backend engineer and early users. happy to help with product design and fundraising decks."
-          className="w-full resize-y rounded-[var(--radius-md)] border border-line bg-surface px-4 py-3 text-[15px] leading-[22px] outline-none placeholder:text-ink-muted/70 focus:border-line-strong"
-        />
-      </label>
+      {!showText ? (
+        <button type="button" onClick={() => setTyping(true)} className="meta mx-auto mt-6 underline-offset-4 hover:text-ink hover:underline">
+          or type instead
+        </button>
+      ) : (
+        <label className="mt-6 flex flex-col gap-2">
+          <span className="meta">{supported ? "your words" : "about you"}</span>
+          <textarea
+            value={transcript + (interim ? ` ${interim}` : "")}
+            onChange={(e) => setTranscript(() => e.target.value)}
+            rows={7}
+            placeholder="hi, i'm anna. i'm building an ai notes app for founders in tbilisi. looking for a backend engineer and early users. happy to help with product design and fundraising decks."
+            className="w-full resize-y rounded-[var(--radius-md)] border border-line bg-surface px-4 py-3 text-[15px] leading-[22px] outline-none placeholder:text-ink-muted/70 focus:border-line-strong"
+          />
+        </label>
+      )}
       {error && (
         <p role="alert" className="mt-3 rounded-[var(--radius-md)] bg-fire-soft px-4 py-3 text-sm text-fire-ink">
           {error}
         </p>
       )}
-      <div className="mt-auto pt-6">
-        <Button className="w-full" disabled={transcript.trim().length < 20 || listening || busy} onClick={onNext}>
-          make my card
-        </Button>
-      </div>
+      {showText && (
+        <div className="mt-auto pt-6">
+          <Button className="w-full" disabled={transcript.trim().length < 20 || listening || busy} onClick={() => onNext()}>
+            make my card
+          </Button>
+        </div>
+      )}
     </section>
   );
 }
@@ -276,11 +306,11 @@ function CardStep({
 
   const set = (k: "name" | "role") => (e: { target: { value: string } }) => setCard((c) => ({ ...c, [k]: e.target.value }));
 
-  const pickPhoto = async (f: File) => {
+  const [cropping, setCropping] = useState<File | null>(null);
+  const pickPhoto = async (blob: Blob) => {
     setUploading(true);
     setError(null);
     try {
-      const blob = await fileToSquareJpeg(f, 640);
       const path = `${uid}/${crypto.randomUUID()}.jpg`;
       const { error } = await supabase.storage.from("avatars").upload(path, blob, { contentType: "image/jpeg" });
       if (error) throw error;
@@ -332,9 +362,19 @@ function CardStep({
           onChange={(e) => {
             const f = e.target.files?.[0];
             e.target.value = "";
-            if (f) void pickPhoto(f);
+            if (f) setCropping(f);
           }}
         />
+        {cropping && (
+          <ImageCropper
+            file={cropping}
+            onCancel={() => setCropping(null)}
+            onDone={(b) => {
+              setCropping(null);
+              void pickPhoto(b);
+            }}
+          />
+        )}
         <label className="flex flex-col gap-1.5">
           <span className="meta">name</span>
           <input
@@ -421,7 +461,7 @@ function CardStep({
 function YoureIn({ inviterName }: { inviterName: string }) {
   const router = useRouter();
   useEffect(() => {
-    const t = setTimeout(() => router.replace("/profile"), 2800);
+    const t = setTimeout(() => router.replace("/feed"), 2800);
     return () => clearTimeout(t);
   }, [router]);
   return (
@@ -433,7 +473,7 @@ function YoureIn({ inviterName }: { inviterName: string }) {
         <p className="text-ink-muted">
           welcome to 1handshake. you and {inviterName.split(" ")[0]} are connected.
         </p>
-        <p className="meta mt-6">opening your profile…</p>
+        <p className="meta mt-6">opening your feed…</p>
       </section>
     </>
   );

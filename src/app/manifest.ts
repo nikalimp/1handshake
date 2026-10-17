@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "1handshake",
     short_name: "1handshake",
     description: "A members-only club for people in tech. Everyone you need is one handshake away.",
-    start_url: "/connect",
+    start_url: "/feed",
     scope: "/",
     display: "standalone",
     orientation: "portrait",

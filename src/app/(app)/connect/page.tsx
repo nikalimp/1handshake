@@ -4,6 +4,7 @@ import { buttonClass } from "@/components/button";
 import { MemberCard } from "@/components/member-card";
 import { ScreenTitle } from "@/components/screen-title";
 import { CARD_FIELDS, type Card, requireMe } from "@/lib/data";
+import { MAIN_URL } from "@/lib/env";
 import { coverUrl } from "@/lib/event-format";
 import { signedUrls } from "@/lib/files";
 import { OFFER_FIELDS, type Offer } from "@/lib/offers";
@@ -74,9 +75,9 @@ export default async function ConnectPage() {
               <Link href="/invite" className={buttonClass("primary")}>
                 + invite
               </Link>
-              <Link href="/events" className={buttonClass("secondary")}>
-                events
-              </Link>
+              <a href={`${MAIN_URL}/events`} target="_blank" rel="noopener" className={buttonClass("secondary")}>
+                events ↗
+              </a>
             </div>
           </div>
         )}

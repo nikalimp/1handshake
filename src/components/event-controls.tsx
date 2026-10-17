@@ -26,9 +26,9 @@ export function GoingButton({ eventId, going, count, size = "md" }: { eventId: s
           }
         });
       }}
-      className={`${size === "sm" ? "h-10 px-4 text-sm" : "h-12 px-5"} inline-flex items-center justify-center gap-1.5 rounded-full font-semibold transition-transform active:scale-[.97] ${on ? "bg-fire-soft text-fire-ink" : "bg-fire text-on-fire"}`}
+      className={`${size === "sm" ? "h-10 px-4 text-sm" : "h-12 px-5"} inline-flex items-center justify-center gap-1.5 rounded-full font-semibold transition-transform active:scale-[.97] ${on ? "bg-fire text-on-fire" : "bg-transparent text-ink shadow-[inset_0_0_0_1.5px_var(--line-strong)]"}`}
     >
-      {on ? "🙋 going" : "🙋 i'm going"}
+      {on ? "✓ going" : "🙋 i'm going"}
       {n > 0 && <span className="opacity-70">· {n}</span>}
     </button>
   );

@@ -3,8 +3,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const tabs = [
-  { href: "/connect", label: "connect", icon: <><rect x="6" y="3" width="12" height="16" rx="3" /><path d="M4 7v12a2 2 0 0 0 2 2h10" /></> },
   { href: "/feed", label: "feed", icon: <><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M8 9h8M8 13h8M8 17h5" /></> },
+  { href: "/connect", label: "connect", icon: <><rect x="6" y="3" width="12" height="16" rx="3" /><path d="M4 7v12a2 2 0 0 0 2 2h10" /></> },
   { href: "/graph", label: "graph", icon: <><circle cx="12" cy="12" r="2.5" /><circle cx="5" cy="6" r="2" /><circle cx="19" cy="6" r="2" /><circle cx="18" cy="19" r="2" /><path d="M10 10.5 6.5 7.3M14 10.5l3.5-3.2M13.6 13.9l3 3.6" /></> },
   { href: "/profile", label: "profile", icon: <><circle cx="12" cy="9" r="3.5" /><path d="M5 20c1.3-3.4 4-5 7-5s5.7 1.6 7 5" /></> },
 ];

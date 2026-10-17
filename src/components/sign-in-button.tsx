@@ -9,7 +9,7 @@ import { APP_URL, CARD_URL } from "@/lib/env";
 const appOrigin = () => (CARD_URL !== APP_URL && window.location.origin === new URL(CARD_URL).origin ? APP_URL : window.location.origin);
 
 /** Google sign-in. `next` is where the member lands after /auth/callback. */
-export function SignInButton({ next = "/connect", label = "continue with google", className = "" }: { next?: string; label?: string; className?: string }) {
+export function SignInButton({ next = "/feed", label = "continue with google", className = "" }: { next?: string; label?: string; className?: string }) {
   const [busy, setBusy] = useState(false);
   return (
     <Button

@@ -6,7 +6,7 @@ import { isSupabaseConfigured, MAIN_URL, PRIVACY_URL, TERMS_URL } from "@/lib/en
 
 export default async function Landing(props: PageProps<"/">) {
   const { error, bye } = await props.searchParams;
-  if (isSupabaseConfigured && (await getMe())) redirect("/connect");
+  if (isSupabaseConfigured && (await getMe())) redirect("/feed");
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col px-4 py-10">

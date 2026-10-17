@@ -66,8 +66,8 @@ export default async function EventPage(props: PageProps<"/events/[slug]">) {
 
   return (
     <article className="flex flex-col gap-5 pt-2">
-      <Link href="/events" className="meta w-fit hover:text-ink">
-        ← events
+      <Link href="/feed" className="meta w-fit hover:text-ink">
+        ← feed
       </Link>
       <div className="overflow-hidden rounded-[var(--radius-lg)] shadow-[var(--shadow-card)]">
         <EventCover path={ev.cover_path} title={ev.title} />

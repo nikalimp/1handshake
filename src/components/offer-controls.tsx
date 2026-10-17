@@ -28,7 +28,7 @@ export function InterestButton({ offerId, interested, count }: { offerId: string
           }
         });
       }}
-      className={`inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-semibold transition-transform active:scale-[.97] ${on ? "bg-fire-soft text-fire-ink" : "bg-fire text-on-fire"}`}
+      className={`inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-sm font-semibold transition-transform active:scale-[.97] ${on ? "bg-fire text-on-fire" : "bg-transparent text-ink shadow-[inset_0_0_0_1.5px_var(--line-strong)]"}`}
     >
       {on ? "✓ interested" : "i'm interested"}
       {n > 0 && <span className="opacity-70">· {n}</span>}

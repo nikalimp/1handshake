@@ -577,4 +577,12 @@ const dcard2 = (await sql(`select admin_member($1) m`, [ids.david])).rows[0].m;
 assert.ok(["hide_offer", "delete_offer", "resolve_member_reports"].every((a) => dcard2.actions.some((x) => x.action === a)), "offer actions show on the author's card");
 console.log("✓ admin stage 2: reports on offers (3 hide) and members, hidden offers, events review/cancel/code, queue oldest first, log; members refused");
 
+// 15. The invite QR lives 10 minutes
+await asAdmin();
+await db.exec(readFileSync("supabase/migrations/20261017001000_invite_ten_minutes.sql", "utf8"));
+await as("nik");
+const ten = (await sql(`select extract(epoch from expires_at - created_at)::int s from create_invite('nik/ten.jpg')`)).rows[0].s;
+assert.ok(Math.abs(ten - 600) < 5, "10 minutes");
+console.log("✓ invite QR lives 10 minutes");
+
 console.log("\nall schema checks passed");

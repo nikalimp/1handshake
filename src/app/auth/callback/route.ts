@@ -11,8 +11,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const origin = requestOrigin(request);
   const code = searchParams.get("code");
-  const nextParam = searchParams.get("next") ?? "/connect";
-  const next = nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/connect";
+  const nextParam = searchParams.get("next") ?? "/feed";
+  const next = nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/feed";
 
   if (!code) return NextResponse.redirect(`${origin}/?error=sign-in-failed`);
 
